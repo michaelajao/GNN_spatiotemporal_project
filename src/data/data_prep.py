@@ -2,13 +2,16 @@
 
 import logging
 import os
+import sys
 from datetime import datetime
 from multiprocessing import Pool
 
 import pandas as pd
 
-# Import utility functions from 'src.utils.utils'
-from src.utils.utils import get_data_location, download_data
+# import get_data_location from src.utils.utils 
+sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'utils'))
+from utils import get_data_location, download_data
+
 
 
 class GenerateTrainingData:
@@ -180,7 +183,7 @@ if __name__ == "__main__":
 
     # Define the date range for data collection
     start_date = "2020-04-01"
-    end_date = "2022-12-31"
+    end_date = "2024-12-31"
 
     # Download and process the training data
     generator.download_jhu_data(start_date, end_date)
