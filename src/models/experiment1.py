@@ -90,7 +90,7 @@ def map_to_week(df, date_column='date_today', groupby_target=None):
 
 K_NEIGHBORS = 5  # Number of nearest neighbors for each state
 START_DATE = '2020-06-01'
-END_DATE = '2020-12-01'
+END_DATE = '2021-12-01'
 FEATURE_COLUMNS = ['confirmed', 'deaths', 'recovered', 'active', 'hospitalization', 'new_cases']
 
 # =======================
@@ -349,6 +349,7 @@ print(static_graph_snapshots[0])
 print("First dynamic graph snapshot:")
 print(dynamic_graph_snapshots[0])
 
+static_graph_snapshots
 
 def visualize_static_graph_snapshot_plotly(graph, state_info, feature='hospitalization'):
     """
