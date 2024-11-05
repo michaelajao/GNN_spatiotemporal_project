@@ -90,7 +90,7 @@ def map_to_week(df, date_column='date_today', groupby_target=None):
 
 K_NEIGHBORS = 5  # Number of nearest neighbors for each state
 START_DATE = '2020-06-01'
-END_DATE = '2020-12-01'
+END_DATE = '2022-12-01'
 FEATURE_COLUMNS = ['confirmed', 'deaths', 'recovered', 'active', 'hospitalization', 'new_cases']
 
 # =======================

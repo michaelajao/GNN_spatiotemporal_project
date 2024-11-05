@@ -14,6 +14,11 @@ from utils import get_data_location, download_data
 
 
 
+import logging
+from datetime import datetime
+from multiprocessing import Pool
+import pandas as pd
+
 class GenerateTrainingData:
     """
     Class to download and generate training data for the GNN Spatio-Temporal project.
@@ -82,7 +87,9 @@ class GenerateTrainingData:
             if "People_Hospitalized" in data.columns:
                 rename_dict["People_Hospitalized"] = "hospitalization"
             else:
-                data["hospitalization"] = 0  # Assign default value if column is missing
+                # Instead of setting to 0, use NaN to allow for better handling later
+                data["hospitalization"] = np.nan
+                logging.warning(f"'People_Hospitalized' missing in {date}.csv")
 
             data = data.rename(columns=rename_dict).dropna(subset=["fips"])
 
@@ -92,7 +99,7 @@ class GenerateTrainingData:
             # Ensure all common columns are present
             for col in self.common_columns:
                 if col not in data.columns:
-                    data[col] = 0  # Assign default value for missing columns
+                    data[col] = np.nan  # Use NaN for missing columns
 
             # Select only the common columns
             data = data[self.common_columns]
@@ -134,14 +141,21 @@ class GenerateTrainingData:
                     "No data was downloaded. Please check the date range and data source."
                 )
                 return None
-            data = pd.concat(data, axis=0).ffill(axis=0).fillna(0)
+            data = pd.concat(data, axis=0)
+            
+            # Convert 'date_today' to datetime if not already
             data["date_today"] = pd.to_datetime(data["date_today"])
+
+            # Sort data by fips and date to ensure correct diff operations
+            data = data.sort_values(by=["fips", "date_today"])
 
             # Calculate daily new cases
             data["new_cases"] = data.groupby("fips")["confirmed"].diff().fillna(0)
             data["new_cases"] = data["new_cases"].apply(lambda x: x if x >= 0 else 0)
 
             # Calculate daily hospitalizations
+            # Handle missing hospitalization data by forward filling within each fips group
+            data["hospitalization"] = data.groupby("fips")["hospitalization"].ffill().fillna(0)
             data["hospitalization"] = data.groupby("fips")["hospitalization"].diff().fillna(0)
             data["hospitalization"] = data["hospitalization"].apply(
                 lambda x: x if x >= 0 else 0
@@ -158,6 +172,9 @@ class GenerateTrainingData:
 
             # Select only the common columns
             data = data[self.common_columns]
+
+            # Fill remaining NaNs if any
+            data = data.fillna(0)
 
             # Save the processed data to a pickle file in the 'processed' directory
             processed_file_path = get_data_location(

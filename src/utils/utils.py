@@ -150,21 +150,42 @@ def envelope(x):
     return x
 
 
-def map_to_week(df, date_column="date_today", groupby_target=None):
-    """
-    Maps 'date_today' to the corresponding week ending date.
+# def map_to_week(df, date_column="date_today", groupby_target=None):
+#     """
+#     Maps 'date_today' to the corresponding week ending date.
 
-    :param df: Pandas DataFrame.
-    :param date_column: Column name containing dates.
-    :param groupby_target: Column(s) to group by and sum over.
-    :return: DataFrame with week_id.
+#     :param df: Pandas DataFrame.
+#     :param date_column: Column name containing dates.
+#     :param groupby_target: Column(s) to group by and sum over.
+#     :return: DataFrame with week_id.
+#     """
+#     df[date_column] = df[date_column].apply(
+#         lambda x: Week.fromdate(x).enddate() if pd.notna(x) else x
+#     )
+#     df[date_column] = pd.to_datetime(df[date_column])
+#     if groupby_target is not None:
+#         df = df.groupby(date_column, as_index=False)[groupby_target].sum()
+#     return df
+
+def map_to_week(df, date_column='date_today', groupby_target=None):
+    """
+    Map dates to week ending dates and aggregate data accordingly.
+
+    Parameters:
+    - df: Pandas DataFrame containing the data.
+    - date_column: Name of the column containing dates.
+    - groupby_target: List of columns to aggregate.
+
+    Returns:
+    - DataFrame with dates mapped to weeks and aggregated.
     """
     df[date_column] = df[date_column].apply(
         lambda x: Week.fromdate(x).enddate() if pd.notna(x) else x
     )
     df[date_column] = pd.to_datetime(df[date_column])
+
     if groupby_target is not None:
-        df = df.groupby(date_column, as_index=False)[groupby_target].sum()
+        df = df.groupby([date_column, 'state'], as_index=False)[groupby_target].sum()
     return df
 
 
