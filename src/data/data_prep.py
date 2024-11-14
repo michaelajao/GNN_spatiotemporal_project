@@ -1,23 +1,17 @@
-# src/data/data_prep.py
-
 import logging
 import os
 import sys
 from datetime import datetime
 from multiprocessing import Pool
 
+import numpy as np
 import pandas as pd
+import requests
+from io import StringIO
 
-# import get_data_location from src.utils.utils 
+# Add the utils directory to sys.path
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'utils'))
-from utils import get_data_location, download_data
-
-
-
-import logging
-from datetime import datetime
-from multiprocessing import Pool
-import pandas as pd
+from utils import get_data_location, download_data  # Ensure these functions are correctly implemented
 
 class GenerateTrainingData:
     """
@@ -27,12 +21,16 @@ class GenerateTrainingData:
 
     def __init__(self):
         self.df = None
-        # Define the base URL for COVID-19 data from the JHU repository
+        # Base URLs for raw data
+        self.url_base_us = (
+            "https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/"
+            "csse_covid_19_data/csse_covid_19_daily_reports_us"
+        )
         self.url_base = (
             "https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/"
-            "csse_covid_19_data/csse_covid_19_daily_reports_us/"
+            "csse_covid_19_data/csse_covid_19_daily_reports"
         )
-        # Common columns expected in the dataset
+        # Common columns expected in the dataset, including the new columns
         self.common_columns = [
             "state",
             "latitude",
@@ -44,7 +42,10 @@ class GenerateTrainingData:
             "recovered",
             "active",
             "hospitalization",
-            "new_cases",  # Added for daily new cases
+            "new_cases",
+            "hospitalization_rate",  # Added
+            "mortality_rate",        # Added
+            "case_fatality_ratio",   # Added
         ]
 
     def download_single_file(self, date):
@@ -52,63 +53,87 @@ class GenerateTrainingData:
         Downloads a single CSV file from the JHU COVID-19 dataset for a specific date.
         Returns a cleaned and processed DataFrame, and saves raw data.
 
-        :param date: Date string in 'MM-DD-YYYY' format.
+        :param date: Date string in 'YYYY-MM-DD' format.
         :return: Processed DataFrame or None if download fails.
         """
-        url = f"{self.url_base}/{date}.csv"
-        data = download_data(url=url)
-
-        if data is None:
-            logging.info(f"{date}.csv doesn't exist or failed to download!")
-            return None
-
+        date_formats = ["%m-%d-%Y", "%m-%d-%y"]
         try:
-            # Save raw data to the 'raw' directory
-            raw_file_path = get_data_location(f"{date}_raw.csv", folder="raw")
-            data.to_csv(raw_file_path, index=False)
-            logging.info(f"Raw data saved to {raw_file_path}")
-
-            # Add 'date_today' column
-            data["date_today"] = datetime.strptime(date, "%m-%d-%Y")
-
-            # Rename columns with conditional handling
-            rename_dict = {
-                "Province_State": "state",
-                "Lat": "latitude",
-                "Long_": "longitude",
-                "Confirmed": "confirmed",
-                "Deaths": "deaths",
-                "Recovered": "recovered",
-                "Active": "active",
-                "FIPS": "fips",
-            }
-
-            # Check if 'People_Hospitalized' exists before renaming
-            if "People_Hospitalized" in data.columns:
-                rename_dict["People_Hospitalized"] = "hospitalization"
-            else:
-                # Instead of setting to 0, use NaN to allow for better handling later
-                data["hospitalization"] = np.nan
-                logging.warning(f"'People_Hospitalized' missing in {date}.csv")
-
-            data = data.rename(columns=rename_dict).dropna(subset=["fips"])
-
-            # Convert 'fips' to integer
-            data["fips"] = data["fips"].astype(int)
-
-            # Ensure all common columns are present
-            for col in self.common_columns:
-                if col not in data.columns:
-                    data[col] = np.nan  # Use NaN for missing columns
-
-            # Select only the common columns
-            data = data[self.common_columns]
-
-            return data
-
-        except Exception as e:
-            logging.error(f"Error processing {date}.csv: {e}")
+            # Generate formatted dates
+            formatted_dates = [datetime.strptime(date, "%Y-%m-%d").strftime(fmt) for fmt in date_formats]
+        except ValueError as ve:
+            logging.error(f"Date formatting error for {date}: {ve}")
             return None
+
+        logging.info(f"Processing date: {date} with formatted dates: {formatted_dates}")
+
+        # Attempt to download from both 'daily_reports_us' and 'daily_reports'
+        for base_url in [self.url_base_us, self.url_base]:
+            for fmt, formatted_date in zip(date_formats, formatted_dates):
+                url = f"{base_url}/{formatted_date}.csv"
+                logging.info(f"Attempting to download data from URL: {url}")
+                data = download_data(url=url)
+
+                if data is not None:
+                    try:
+                        # Save raw data to the 'raw' directory
+                        folder = "raw"
+                        raw_file_path = get_data_location(f"{formatted_date}_raw.csv", folder=folder)
+                        data.to_csv(raw_file_path, index=False)
+                        logging.info(f"Raw data saved to {raw_file_path}")
+
+                        # Add 'date_today' column based on the date format
+                        data["date_today"] = datetime.strptime(formatted_date, fmt)
+
+                        # Rename columns with conditional handling
+                        rename_dict = {
+                            "Province_State": "state",
+                            "Lat": "latitude",
+                            "Long_": "longitude",
+                            "Confirmed": "confirmed",
+                            "Deaths": "deaths",
+                            "Recovered": "recovered",
+                            "Active": "active",
+                            "FIPS": "fips",
+                            "Date": "date_today",  # Ensure 'Date' is mapped if present
+                            "Hospitalization_Rate": "hospitalization_rate",     # Added
+                            "Mortality_Rate": "mortality_rate",                 # Added
+                            "Case_Fatality_Ratio": "case_fatality_ratio",       # Added
+                        }
+
+                        # Check if 'People_Hospitalized' exists before renaming
+                        if "People_Hospitalized" in data.columns:
+                            rename_dict["People_Hospitalized"] = "hospitalization"
+                        else:
+                            # Use NaN to allow for better handling later
+                            data["hospitalization"] = np.nan
+                            logging.warning(f"'People_Hospitalized' missing in {formatted_date}.csv")
+
+                        data = data.rename(columns=rename_dict).dropna(subset=["fips"])
+
+                        # Convert 'fips' to integer
+                        data["fips"] = data["fips"].astype(int)
+
+                        # Ensure all common columns are present
+                        for col in self.common_columns:
+                            if col not in data.columns:
+                                # Assign NaN for missing columns to allow for proper handling
+                                data[col] = np.nan
+                                logging.warning(f"Column '{col}' missing in {formatted_date}.csv. Filled with NaN.")
+
+                        # Select only the common columns
+                        data = data[self.common_columns]
+
+                        return data
+
+                    except Exception as e:
+                        logging.error(f"Error processing {formatted_date}.csv: {e}")
+                        return None
+                else:
+                    logging.info(f"{formatted_date}.csv doesn't exist or failed to download from {base_url}!")
+
+        # If all attempts fail
+        logging.warning(f"Data for {date} is missing in all attempted formats and folders.")
+        return None
 
     def download_jhu_data(self, start_time, end_time):
         """
@@ -121,11 +146,12 @@ class GenerateTrainingData:
         :return: Combined processed DataFrame or None if download fails.
         """
         try:
-            # Generate list of dates in 'MM-DD-YYYY' format
-            date_list = pd.date_range(start_time, end_time).strftime("%m-%d-%Y")
+            # Generate list of dates in 'YYYY-MM-DD' format
+            date_list = pd.date_range(start_time, end_time).strftime("%Y-%m-%d")
+            logging.info(f"Generated date list from {start_time} to {end_time}")
 
             # Use multiprocessing to download data files in parallel
-            with Pool() as pool:
+            with Pool(processes=10) as pool:  # Limit to 10 parallel processes
                 data = pool.map(self.download_single_file, date_list)
             logging.info("Finished downloading data.")
 
@@ -142,7 +168,8 @@ class GenerateTrainingData:
                 )
                 return None
             data = pd.concat(data, axis=0)
-            
+            logging.info(f"Concatenated data shape: {data.shape}")
+
             # Convert 'date_today' to datetime if not already
             data["date_today"] = pd.to_datetime(data["date_today"])
 
@@ -165,10 +192,7 @@ class GenerateTrainingData:
             for col in self.common_columns:
                 if col not in data.columns:
                     data[col] = 0  # Assign default value for missing columns
-
-            # Update the list of common columns to include 'new_cases' if not already
-            if "new_cases" not in self.common_columns:
-                self.common_columns.append("new_cases")
+                    logging.warning(f"Column '{col}' missing in the concatenated data. Filled with 0.")
 
             # Select only the common columns
             data = data[self.common_columns]
@@ -190,17 +214,20 @@ class GenerateTrainingData:
             logging.error(f"An error occurred during data download and processing: {e}")
             return None
 
-
 if __name__ == "__main__":
-    # Configure logging
-    logging.basicConfig(level=logging.INFO)
-
+    # Configure logging with detailed format and file handler
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s - %(levelname)s - %(message)s',
+        handlers=[
+            logging.StreamHandler(sys.stdout),
+            logging.FileHandler("data_generation.log")
+        ]
+    )
     # Initialize the data generator
     generator = GenerateTrainingData()
-
     # Define the date range for data collection
     start_date = "2020-04-01"
-    end_date = "2024-12-31"
-
+    end_date = "2023-12-31"
     # Download and process the training data
     generator.download_jhu_data(start_date, end_date)
