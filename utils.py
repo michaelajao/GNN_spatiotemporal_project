@@ -1,3 +1,5 @@
+# FILE: utils.py
+
 import io
 import logging
 import os
@@ -36,15 +38,19 @@ def get_data_location(file_name, folder=None):
 
 def check_url(url):
     """
-    Function to check the existence of ulr
+    Function to check the existence of url
     :param url:
     :return:
     """
-    request = requests.get(url, verify=False)
-    if request.status_code < 400:
-        return True
-    else:
-        logging.info(f"URL for {url.split('/')[-1]} does not exist!")
+    try:
+        request = requests.get(url, verify=False)
+        if request.status_code < 400:
+            return True
+        else:
+            logging.info(f"URL for {url.split('/')[-1]} does not exist!")
+            return False
+    except Exception as e:
+        logging.info(f"Error checking URL {url}: {e}")
         return False
 
 def download_data(url):
@@ -56,10 +62,13 @@ def download_data(url):
     :rtype: pandas.DataFrame
     """
     if check_url(url):
-        x = requests.get(url=url, verify=False).content
-        df = pd.read_csv(io.StringIO(x.decode('utf8')))
-        return df
-
+        try:
+            x = requests.get(url=url, verify=False).content
+            df = pd.read_csv(io.StringIO(x.decode('utf8')))
+            return df
+        except Exception as e:
+            logging.info(f"Error downloading data from {url}: {e}")
+            return None
 
 def calculate_ccc(y_true, y_pred):
     """
@@ -78,8 +87,7 @@ def calculate_ccc(y_true, y_pred):
     sd_pred = np.std(y_pred)
     numerator = 2 * cor * sd_true * sd_pred
     denominator = var_true + var_pred + (mean_true - mean_pred) ** 2
-    return numerator / denominator
-
+    return numerator / denominator if denominator != 0 else 0
 
 def gravity_law_commute_dist(lat1, lng1, pop1, lat2, lng2, pop2, r=1):
     """
@@ -87,30 +95,27 @@ def gravity_law_commute_dist(lat1, lng1, pop1, lat2, lng2, pop2, r=1):
     :param lat1: latitude of location 1
     :type lat1: float
     :param lng1: longitude of location 1
-    :type lat1: float
+    :type lng1: float
     :param pop1: population of location 1
-    :type lat1: float or int
+    :type pop1: float or int
     :param lat2: latitude of location 2
-    :type lat1: float
+    :type lat2: float
     :param lng2: longitude of location 2
-    :type lat1: float
+    :type lng2: float
     :param pop2: population of location 2
-    :type lat1: float or int
-    :param r: diameter, by default 1
-    :type lat1: float or int
+    :type pop2: float or int
+    :param r: decay rate, by default 1
+    :type r: float or int
     :return: edge value
     :rtype: float or int
     """
-    d = haversine((lat1, lng1), (lat2, lng2), 'km')
-    c = 1
-    w = 0
+    d = haversine((lat1, lng1), (lat2, lng2), unit='km')
     alpha = 0.1
     beta = 0.1
     r = 1e4
-    
-    w = (np.exp(-d / r)) / (abs((pop1 ** alpha) - (pop2 ** beta))+1e-5)
-    return w
 
+    w = (np.exp(-d / r)) / (abs((pop1 ** alpha) - (pop2 ** beta)) + 1e-5)
+    return w
 
 def envelope(x):
     """
@@ -128,22 +133,20 @@ def envelope(x):
             x[i + 1] = a
     return x
 
-
 def map_to_week(df, date_column='date_today', groupby_target=None):
     """
-    map date_today to week_id
-    :param df: dataframe
-    :type df: pandas.DataFrame
-    :param date_column: column name related to date_today
-    :type date_column: str
-    :param groupby_target: group by date_today and sum over thee groupby_target
-    :type groupby_target: None or str or list
-    :return: dataframe with week_id
-    :rtype: pandas.DataFrame
+    Map date_today to week_id
+
+    Args:
+        df (pd.DataFrame): Input dataframe.
+        date_column (str, optional): Column name related to date_today. Defaults to 'date_today'.
+        groupby_target (None or str or list, optional): Group by date_today and sum over the groupby_target. Defaults to None.
+
+    Returns:
+        pd.DataFrame: Dataframe with week_id.
     """
     df[date_column] = df[date_column].apply(lambda x: Week.fromdate(x).enddate() if pd.notna(x) else x)
     df[date_column] = pd.to_datetime(df[date_column])
     if groupby_target is not None:
-        df = df.groupby('date_today', as_index=False)[groupby_target].sum()
+        df = df.groupby(date_column, as_index=False)[groupby_target].sum()
     return df
-

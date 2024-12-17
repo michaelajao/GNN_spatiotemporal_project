@@ -1,148 +1,108 @@
+# FILE: model.py
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import numpy as np
-import warnings
-#warnings.filterwarnings('ignore')
+from torch_geometric.nn import GATConv
 
-class GATLayer(nn.Module):
-    def __init__(self, g, in_dim, out_dim):
-        super(GATLayer, self).__init__()
-        self.g = g
-        self.fc = nn.Linear(in_dim, out_dim)
-        self.attn_fc = nn.Linear(2 * out_dim, 1)
-        self.reset_parameters()
-
-    def reset_parameters(self):
-        gain = nn.init.calculate_gain('relu')
-        nn.init.xavier_normal_(self.fc.weight, gain=gain)
-        nn.init.xavier_normal_(self.attn_fc.weight, gain=gain)
-
-    def edge_attention(self, edges):
-        z2 = torch.cat([edges.src['z'], edges.dst['z']], dim=1)
-        a = self.attn_fc(z2)
-        return {'e': F.leaky_relu(a)}
-
-    def message_func(self, edges):
-        return {'z': edges.src['z'], 'e': edges.data['e']}
-
-    def reduce_func(self, nodes):
-        alpha = F.softmax(nodes.mailbox['e'], dim=1)
-        h = torch.sum(alpha * nodes.mailbox['z'], dim=1)
-        return {'h': h}
-
-    def forward(self, h):
-        z = self.fc(h)
-        self.g.ndata['z'] = z
-        self.g.apply_edges(self.edge_attention)
-        self.g.update_all(self.message_func, self.reduce_func)
-        return self.g.ndata.pop('h')
-
-class MultiHeadGATLayer(nn.Module):
-    def __init__(self, g, in_dim, out_dim, num_heads, merge='cat'):
-        super(MultiHeadGATLayer, self).__init__()
-        self.heads = nn.ModuleList()
-        for i in range(num_heads):
-            self.heads.append(GATLayer(g, in_dim, out_dim))
-        self.merge = merge
-
-    def forward(self, h):
-        head_outs = [attn_head(h) for attn_head in self.heads]
-        if self.merge == 'cat':
-            return torch.cat(head_outs, dim=1)
-        else:
-            return torch.mean(torch.stack(head_outs))
-        
 class STAN(nn.Module):
-    def __init__(self, g, in_dim, hidden_dim1, hidden_dim2, gru_dim, num_heads, pred_window, device):
+    def __init__(self, in_dim, hidden_dim1, hidden_dim2, gru_dim, num_heads, pred_window, device):
+        """
+        Spatio-Temporal Attention Network (STAN) Model using PyTorch Geometric.
+
+        Args:
+            in_dim (int): Input feature dimension.
+            hidden_dim1 (int): Hidden dimension for the first GAT layer.
+            hidden_dim2 (int): Hidden dimension for the second GAT layer.
+            gru_dim (int): Dimension of the GRU hidden state.
+            num_heads (int): Number of attention heads.
+            pred_window (int): Prediction window size.
+            device (torch.device): Device to run computations on.
+        """
         super(STAN, self).__init__()
-        self.g = g
-        
-        self.layer1 = MultiHeadGATLayer(self.g, in_dim, hidden_dim1, num_heads)
-        self.layer2 = MultiHeadGATLayer(self.g, hidden_dim1 * num_heads, hidden_dim2, 1)
-
-        self.pred_window = pred_window
-        self.gru = nn.GRUCell(hidden_dim2, gru_dim)
-    
-        self.nn_res_I = nn.Linear(gru_dim+2, pred_window)
-        self.nn_res_R = nn.Linear(gru_dim+2, pred_window)
-
-        self.nn_res_sir = nn.Linear(gru_dim+2, 2)
-        
-        self.hidden_dim2 = hidden_dim2
-        self.gru_dim = gru_dim
         self.device = device
 
-    def forward(self, dynamic, cI, cR, N, I, R, h=None):
-        num_loc, timestep, n_feat = dynamic.size()
-        N = N.squeeze()
+        # GAT Layers
+        self.gat1 = GATConv(in_channels=in_dim, out_channels=hidden_dim1, heads=num_heads, concat=True, dropout=0.6)
+        self.gat2 = GATConv(in_channels=hidden_dim1 * num_heads, out_channels=hidden_dim2, heads=1, concat=True, dropout=0.6)
 
+        # GRU Cell
+        self.gru = nn.GRUCell(hidden_dim2, gru_dim)
+
+        # Prediction Layers
+        self.nn_res_I = nn.Linear(gru_dim + 2, pred_window)
+        self.nn_res_R = nn.Linear(gru_dim + 2, pred_window)
+        self.nn_res_sir = nn.Linear(gru_dim + 2, 2)
+
+    def forward(self, data, dynamic, cI, cR, N, I, R, dI, dR, h=None):
+        """
+        Forward pass for the STAN model.
+
+        Args:
+            data (torch_geometric.data.Batch): Batched graph data containing edge_index and batch.
+            dynamic (Tensor): Dynamic features [batch_size * num_loc, history_window * n_feat].
+            cI (Tensor): Cumulative infected cases [batch_size * num_loc].
+            cR (Tensor): Cumulative recovered cases [batch_size * num_loc].
+            N (Tensor): Total population [batch_size * num_loc, 1].
+            I (Tensor): Current infected cases [batch_size * num_loc].
+            R (Tensor): Current recovered cases [batch_size * num_loc].
+            dI (Tensor): Change in infected cases [batch_size * num_loc].
+            dR (Tensor): Change in recovered cases [batch_size * num_loc].
+            h (Tensor, optional): Hidden state for GRU. Defaults to None.
+
+        Returns:
+            Tuple[Tensor, Tensor, Tensor, Tensor, Tensor]: 
+                - Predicted I [batch_size * num_loc, pred_window]
+                - Predicted R [batch_size * num_loc, pred_window]
+                - Physical I predictions [batch_size * num_loc, pred_window]
+                - Physical R predictions [batch_size * num_loc, pred_window]
+                - Updated hidden state [batch_size * num_loc, gru_dim]
+        """
+        # Pass through GAT layers
+        x = dynamic  # [batch_size * num_loc, in_dim]
+        x = self.gat1(x, data.edge_index)  # [batch_size * num_loc, hidden_dim1 * num_heads]
+        x = F.elu(x)
+        x = self.gat2(x, data.edge_index)  # [batch_size * num_loc, hidden_dim2]
+        x = F.elu(x)
+
+        # GRU Cell
         if h is None:
-            h = torch.zeros(1, self.gru_dim).to(self.device)
-            gain = nn.init.calculate_gain('relu')
-            nn.init.xavier_normal_(h, gain=gain)  
+            h = torch.zeros(x.size(0), self.gru.hidden_size).to(self.device)
+        
+        h = self.gru(x, h)  # [batch_size * num_loc, gru_dim]
 
-        new_I = []
-        new_R = []
+        # Concatenate GRU hidden state with cI and cR per node
+        hc = torch.cat((h, cI.unsqueeze(1), cR.unsqueeze(1)), dim=1)  # [batch_size * num_loc, gru_dim + 2]
+
+        # Predict I and R
+        pred_I = self.nn_res_I(hc)  # [batch_size * num_loc, pred_window]
+        pred_R = self.nn_res_R(hc)  # [batch_size * num_loc, pred_window]
+
+        # Predict alpha and beta for SIR model
+        pred_res = self.nn_res_sir(hc)  # [batch_size * num_loc, 2]
+        alpha = torch.sigmoid(pred_res[:, 0])  # [batch_size * num_loc]
+        beta = torch.sigmoid(pred_res[:, 1])   # [batch_size * num_loc]
+
+        # Physical model predictions
+        # S_graph = N - I - R (per node)
+        S_graph = N.squeeze(1) - I - R  # [batch_size * num_loc]
+
         phy_I = []
         phy_R = []
-        self.alpha_list = []
-        self.beta_list = []
-        self.alpha_scaled = []
-        self.beta_scaled = [] 
 
-        for each_step in range(timestep):        
-            cur_h = self.layer1(dynamic[:, each_step, :])
-            cur_h = F.elu(cur_h)
-            cur_h = self.layer2(cur_h)
-            cur_h = F.elu(cur_h)
-            
-            cur_h = torch.max(cur_h, 0)[0].reshape(1, self.hidden_dim2)
-            
-            h = self.gru(cur_h, h)
-            hc = torch.cat((h, cI[each_step].reshape(1,1), cR[each_step].reshape(1,1)),dim=1)
-            
-            pred_I = self.nn_res_I(hc)
-            pred_R = self.nn_res_R(hc)
-            new_I.append(pred_I)
-            new_R.append(pred_R)
+        for _ in range(pred_window):
+            dI_val = alpha * I * (S_graph / N.squeeze(1)) - beta * I  # [batch_size * num_loc]
+            dR_val = beta * I  # [batch_size * num_loc]
 
-            pred_res = self.nn_res_sir(hc)
-            alpha = pred_res[:, 0]
-            beta =  pred_res[:, 1]
-            
-            self.alpha_list.append(alpha)
-            self.beta_list.append(beta)
-            alpha = torch.sigmoid(alpha)
-            beta = torch.sigmoid(beta)
-            self.alpha_scaled.append(alpha)
-            self.beta_scaled.append(beta)
-            
-            cur_phy_I = []
-            cur_phy_R = []
-            for i in range(self.pred_window):
-                last_I = I[each_step] if i == 0 else last_I + dI.detach()
-                last_R = R[each_step] if i == 0 else last_R + dR.detach()
+            phy_I.append(dI_val)
+            phy_R.append(dR_val)
 
-                last_S = N - last_I - last_R
-                
-                dI = alpha * last_I * (last_S/N) - beta * last_I
-                dR = beta * last_I
-                cur_phy_I.append(dI)
-                cur_phy_R.append(dR)
-            cur_phy_I = torch.stack(cur_phy_I).to(self.device).permute(1,0)
-            cur_phy_R = torch.stack(cur_phy_R).to(self.device).permute(1,0)
+            # Update I and R for next step
+            I = I + dI_val.detach()
+            R = R + dR_val.detach()
 
-            phy_I.append(cur_phy_I)
-            phy_R.append(cur_phy_R)
+        phy_I = torch.stack(phy_I, dim=1)  # [batch_size * num_loc, pred_window]
+        phy_R = torch.stack(phy_R, dim=1)  # [batch_size * num_loc, pred_window]
 
-        new_I = torch.stack(new_I).to(self.device).permute(1,0,2)
-        new_R = torch.stack(new_R).to(self.device).permute(1,0,2)
-        phy_I = torch.stack(phy_I).to(self.device).permute(1,0,2)
-        phy_R = torch.stack(phy_R).to(self.device).permute(1,0,2)
-
-        self.alpha_list = torch.stack(self.alpha_list).squeeze()
-        self.beta_list = torch.stack(self.beta_list).squeeze()
-        self.alpha_scaled = torch.stack(self.alpha_scaled).squeeze()
-        self.beta_scaled = torch.stack(self.beta_scaled).squeeze()
-        return new_I, new_R, phy_I, phy_R, h
+        # Return all predictions
+        return pred_I, pred_R, phy_I, phy_R, h
