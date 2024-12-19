@@ -37,7 +37,7 @@ def seed_torch(seed=RANDOM_SEED):
 seed_torch()
 
 # Device configuration
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+device = torch.device('cpu')
 print(f'Using device: {device}')
 
 # Set environment variables
@@ -272,10 +272,11 @@ if normalize:
         dynamic_feat[i, :, 1] = (dynamic_feat[i, :, 1] - normalizer['dR'][each_loc][0]) / normalizer['dR'][each_loc][1]
         dynamic_feat[i, :, 2] = (dynamic_feat[i, :, 2] - normalizer['dS'][each_loc][0]) / normalizer['dS'][each_loc][1]
 
-dI_mean = np.array([normalizer['dI'][loc][0] for loc in loc_list], dtype=np.float32)
-dI_std = np.array([normalizer['dI'][loc][1] for loc in loc_list], dtype=np.float32)
-dR_mean = np.array([normalizer['dR'][loc][0] for loc in loc_list], dtype=np.float32)
-dR_std = np.array([normalizer['dR'][loc][1] for loc in loc_list], dtype=np.float32)
+# Convert normalization parameters to torch tensors and move to device
+dI_mean = torch.tensor([normalizer['dI'][loc][0] for loc in loc_list], dtype=torch.float32).to(device)
+dI_std = torch.tensor([normalizer['dI'][loc][1] for loc in loc_list], dtype=torch.float32).to(device)
+dR_mean = torch.tensor([normalizer['dR'][loc][0] for loc in loc_list], dtype=torch.float32).to(device)
+dR_std = torch.tensor([normalizer['dR'][loc][1] for loc in loc_list], dtype=torch.float32).to(device)
 
 # Split data into train, validation, and test sets
 train_feat = dynamic_feat[:, :-valid_window - test_window, :]  # [num_loc, train_timestep, 3]
@@ -326,12 +327,15 @@ pred_window = pred_window
 device = device
 
 model = STAN(
-    in_dim=in_dim,
-    hidden_dim1=hidden_dim1,
-    hidden_dim2=hidden_dim2,
+    num_nodes=num_locations,
+    num_features=in_dim,
+    num_timesteps_input=history_window,
+    num_timesteps_output=pred_window,
+    population=1e10,  # Adjust if a different population is needed
+    gat_dim1=hidden_dim1,
+    gat_dim2=hidden_dim2,
     gru_dim=gru_dim,
     num_heads=num_heads,
-    pred_window=pred_window,
     device=device
 ).to(device)
 
@@ -371,15 +375,15 @@ class SIRDataset(Dataset):
         return len(self.x)
 
     def __getitem__(self, idx):
-        node_features = self.x[idx]  # [num_loc, history_window * n_feat]
-        cI = self.cI[idx]  # [num_loc]
-        cR = self.cR[idx]  # [num_loc]
-        I = self.I[idx]  # [num_loc]
-        R = self.R[idx]  # [num_loc]
-        dI = self.dI[idx]  # [num_loc]
-        dR = self.dR[idx]  # [num_loc]
-        yI = self.yI[idx]  # [num_loc, pred_window]
-        yR = self.yR[idx]  # [num_loc, pred_window]
+        node_features = torch.tensor(self.x[idx], dtype=torch.float32)  # Convert to tensor
+        cI = torch.tensor(self.cI[idx], dtype=torch.float32)            # Convert to tensor
+        cR = torch.tensor(self.cR[idx], dtype=torch.float32)            # Convert to tensor
+        I = torch.tensor(self.I[idx], dtype=torch.float32)              # Convert to tensor
+        R = torch.tensor(self.R[idx], dtype=torch.float32)              # Convert to tensor
+        dI = torch.tensor(self.dI[idx], dtype=torch.float32)            # Convert to tensor
+        dR = torch.tensor(self.dR[idx], dtype=torch.float32)            # Convert to tensor
+        yI = torch.tensor(self.yI[idx], dtype=torch.float32)            # Convert to tensor
+        yR = torch.tensor(self.yR[idx], dtype=torch.float32)            # Convert to tensor
 
         # Create a Data object for each sample
         data_sample = Data(
@@ -388,7 +392,7 @@ class SIRDataset(Dataset):
         )
         data_sample.cI = cI.clone().detach()
         data_sample.cR = cR.clone().detach()
-        data_sample.N = self.N.clone().detach()  # [num_loc, 1]
+        data_sample.N = self.N.clone().detach()  # Convert and clone
         data_sample.I = I.clone().detach()
         data_sample.R = R.clone().detach()
         data_sample.dI = dI.clone().detach()
@@ -422,41 +426,37 @@ for epoch in tqdm(range(epoch_count), desc='Training Epochs'):
 
         # Extract tensors
         dynamic = batch.x  # [batch_size * num_loc, history_window * n_feat]
-        cI = batch.cI  # [batch_size * num_loc]
-        cR = batch.cR  # [batch_size * num_loc]
+        adj = data.edge_index  # Adjacency information from train.py
+        states = torch.stack([batch.I, batch.R], dim=-1)  # Combine I and R for states
         N_batch = batch.N  # [num_loc, 1]
-        I = batch.I  # [batch_size * num_loc]
-        R = batch.R  # [batch_size * num_loc]
-        dI = batch.dI  # [batch_size * num_loc]
-        dR = batch.dR  # [batch_size * num_loc]
         yI = batch.yI  # [batch_size * num_loc, pred_window]
         yR = batch.yR  # [batch_size * num_loc, pred_window]
 
         # Pass through the model
-        predictions_I, predictions_R, phy_I, phy_R, _ = model(
-            batch,
-            dynamic,       # [batch_size * num_loc, 3 * history_window]
-            cI,            # [batch_size * num_loc]
-            cR,            # [batch_size * num_loc]
-            N_batch,       # [num_loc, 1]
-            I,             # [batch_size * num_loc]
-            R,             # [batch_size * num_loc]
-            dI,            # [batch_size * num_loc]
-            dR,            # [batch_size * num_loc]
-            h=None
+        predictions, phy_predictions = model(
+            X=dynamic,       # [batch_size * num_loc, history_window * n_feat]
+            adj=edge_index,  # [2, num_edges]
+            states=states,   # [batch_size * num_loc, 2]
+            N=N_batch        # [num_loc, 1]
         )
 
         # Normalize physical predictions if required
         if normalize:
-            phy_I = (phy_I * dI_std.to(device)) + dI_mean.to(device)  # [batch_size * num_loc, pred_window]
-            phy_R = (phy_R * dR_std.to(device)) + dR_mean.to(device)  # [batch_size * num_loc, pred_window]
+            # Expand normalization tensors to match phy_I and phy_R dimensions
+            dI_std_expanded = dI_std.unsqueeze(1).repeat(1, pred_window)
+            dI_mean_expanded = dI_mean.unsqueeze(1).repeat(1, pred_window)
+            dR_std_expanded = dR_std.unsqueeze(1).repeat(1, pred_window)
+            dR_mean_expanded = dR_mean.unsqueeze(1).repeat(1, pred_window)
+
+            phy_predictions[:, :, 0] = (phy_predictions[:, :, 0] * dI_std_expanded) + dI_mean_expanded  # [batch_size * num_loc, pred_window]
+            phy_predictions[:, :, 1] = (phy_predictions[:, :, 1] * dR_std_expanded) + dR_mean_expanded  # [batch_size * num_loc, pred_window]
 
         # Compute loss
         loss = (
-            criterion(predictions_I, yI) +
-            criterion(predictions_R, yR) +
-            scale * criterion(phy_I, yI) +
-            scale * criterion(phy_R, yR)
+            criterion(predictions[:, :, 0], yI) +
+            criterion(predictions[:, :, 1], yR) +
+            scale * criterion(phy_predictions[:, :, 0], yI) +
+            scale * criterion(phy_predictions[:, :, 1], yR)
         )
 
         # Backward pass and optimization
@@ -477,41 +477,37 @@ for epoch in tqdm(range(epoch_count), desc='Training Epochs'):
 
             # Extract tensors
             dynamic = batch.x  # [batch_size * num_loc, history_window * n_feat]
-            cI = batch.cI  # [batch_size * num_loc]
-            cR = batch.cR  # [batch_size * num_loc]
+            adj = data.edge_index  # Adjacency information from train.py
+            states = torch.stack([batch.I, batch.R], dim=-1)  # Combine I and R for states
             N_batch = batch.N  # [num_loc, 1]
-            I = batch.I  # [batch_size * num_loc]
-            R = batch.R  # [batch_size * num_loc]
-            dI = batch.dI  # [batch_size * num_loc]
-            dR = batch.dR  # [batch_size * num_loc]
             yI = batch.yI  # [batch_size * num_loc, pred_window]
             yR = batch.yR  # [batch_size * num_loc, pred_window]
 
             # Pass through the model
-            predictions_I, predictions_R, phy_I, phy_R, _ = model(
-                batch,
-                dynamic,       # [batch_size * num_loc, 3 * history_window]
-                cI,            # [batch_size * num_loc]
-                cR,            # [batch_size * num_loc]
-                N_batch,       # [num_loc, 1]
-                I,             # [batch_size * num_loc]
-                R,             # [batch_size * num_loc]
-                dI,            # [batch_size * num_loc]
-                dR,            # [batch_size * num_loc]
-                h=None
+            predictions, phy_predictions = model(
+                X=dynamic,       # [batch_size * num_loc, history_window * n_feat]
+                adj=edge_index,  # [2, num_edges]
+                states=states,   # [batch_size * num_loc, 2]
+                N=N_batch        # [num_loc, 1]
             )
 
             # Normalize physical predictions if required
             if normalize:
-                phy_I = (phy_I * dI_std.to(device)) + dI_mean.to(device)  # [batch_size * num_loc, pred_window]
-                phy_R = (phy_R * dR_std.to(device)) + dR_mean.to(device)  # [batch_size * num_loc, pred_window]
+                # Expand normalization tensors to match phy_I and phy_R dimensions
+                dI_std_expanded = dI_std.unsqueeze(1).repeat(1, pred_window)
+                dI_mean_expanded = dI_mean.unsqueeze(1).repeat(1, pred_window)
+                dR_std_expanded = dR_std.unsqueeze(1).repeat(1, pred_window)
+                dR_mean_expanded = dR_mean.unsqueeze(1).repeat(1, pred_window)
+
+                phy_predictions[:, :, 0] = (phy_predictions[:, :, 0] * dI_std_expanded) + dI_mean_expanded  # [batch_size * num_loc, pred_window]
+                phy_predictions[:, :, 1] = (phy_predictions[:, :, 1] * dR_std_expanded) + dR_mean_expanded  # [batch_size * num_loc, pred_window]
 
             # Compute loss
             loss = (
-                criterion(predictions_I, yI) +
-                criterion(predictions_R, yR) +
-                scale * criterion(phy_I, yI) +
-                scale * criterion(phy_R, yR)
+                criterion(predictions[:, :, 0], yI) +
+                criterion(predictions[:, :, 1], yR) +
+                scale * criterion(phy_predictions[:, :, 0], yI) +
+                scale * criterion(phy_predictions[:, :, 1], yR)
             )
 
             val_loss += loss.item()
@@ -558,43 +554,39 @@ with torch.no_grad():
 
         # Extract tensors
         dynamic = batch.x  # [batch_size * num_loc, history_window * n_feat]
-        cI = batch.cI  # [batch_size * num_loc]
-        cR = batch.cR  # [batch_size * num_loc]
+        adj = data.edge_index  # Adjacency information from train.py
+        states = torch.stack([batch.I, batch.R], dim=-1)  # Combine I and R for states
         N_batch = batch.N  # [num_loc, 1]
-        I = batch.I  # [batch_size * num_loc]
-        R = batch.R  # [batch_size * num_loc]
-        dI = batch.dI  # [batch_size * num_loc]
-        dR = batch.dR  # [batch_size * num_loc]
         yI = batch.yI  # [batch_size * num_loc, pred_window]
         yR = batch.yR  # [batch_size * num_loc, pred_window]
 
         # Pass through the model
-        predictions_I, predictions_R, phy_I, phy_R, _ = model(
-            batch,
-            dynamic,       # [batch_size * num_loc, 3 * history_window]
-            cI,            # [batch_size * num_loc]
-            cR,            # [batch_size * num_loc]
-            N_batch,       # [num_loc, 1]
-            I,             # [batch_size * num_loc]
-            R,             # [batch_size * num_loc]
-            dI,            # [batch_size * num_loc]
-            dR,            # [batch_size * num_loc]
-            h=None
+        predictions, phy_predictions = model(
+            X=dynamic,       # [batch_size * num_loc, history_window * n_feat]
+            adj=edge_index,  # [2, num_edges]
+            states=states,   # [batch_size * num_loc, 2]
+            N=N_batch        # [num_loc, 1]
         )
 
         # Normalize physical predictions if required
         if normalize:
-            phy_I = (phy_I * dI_std.to(device)) + dI_mean.to(device)  # [batch_size * num_loc, pred_window]
-            phy_R = (phy_R * dR_std.to(device)) + dR_mean.to(device)  # [batch_size * num_loc, pred_window]
+            # Expand normalization tensors to match phy_I and phy_R dimensions
+            dI_std_expanded = dI_std.unsqueeze(1).repeat(1, pred_window)
+            dI_mean_expanded = dI_mean.unsqueeze(1).repeat(1, pred_window)
+            dR_std_expanded = dR_std.unsqueeze(1).repeat(1, pred_window)
+            dR_mean_expanded = dR_mean.unsqueeze(1).repeat(1, pred_window)
+
+            phy_predictions[:, :, 0] = (phy_predictions[:, :, 0] * dI_std_expanded) + dI_mean_expanded  # [batch_size * num_loc, pred_window]
+            phy_predictions[:, :, 1] = (phy_predictions[:, :, 1] * dR_std_expanded) + dR_mean_expanded  # [batch_size * num_loc, pred_window]
 
         # Cumulatively sum predictions
-        pred_I_batch = predictions_I.cumsum(dim=1) + I.unsqueeze(1)  # [batch_size * num_loc, pred_window]
-        pred_R_batch = predictions_R.cumsum(dim=1) + R.unsqueeze(1)  # [batch_size * num_loc, pred_window]
+        pred_I_batch = predictions[:, :, 0].cumsum(dim=1) + batch.I.unsqueeze(1)  # [batch_size * num_loc, pred_window]
+        pred_R_batch = predictions[:, :, 1].cumsum(dim=1) + batch.R.unsqueeze(1)  # [batch_size * num_loc, pred_window]
 
         test_pred_I.append(pred_I_batch.cpu().numpy())
         test_pred_R.append(pred_R_batch.cpu().numpy())
-        test_phy_I.append(phy_I.cpu().numpy())
-        test_phy_R.append(phy_R.cpu().numpy())
+        test_phy_I.append(phy_predictions[:, :, 0].cpu().numpy())
+        test_phy_R.append(phy_predictions[:, :, 1].cpu().numpy())
 
 # Concatenate all batches
 test_pred_I = np.concatenate(test_pred_I, axis=0)  # [num_samples * num_loc, pred_window]
