@@ -17,7 +17,6 @@ from torch.utils.data import Dataset, DataLoader
 from torch.nn import Parameter
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import mean_absolute_error, r2_score
-from sklearn.preprocessing import StandardScaler
 
 ########################################
 # Seed & Device Configuration
@@ -49,10 +48,10 @@ k = 8
 hidA = 32
 hidR = 40  # Updated from 20 to 40
 hidP = 1
-n_layer = 1  # Reduced from 2
+n_layer = 4  # Reduced from 2
 dropout = 0.5
 learning_rate = 1e-3  # Adjusted
-num_epochs = 100
+num_epochs = 1000
 batch_size = 32
 threshold_distance = 300  # km threshold for adjacency
 
@@ -80,12 +79,15 @@ def load_and_correct_data(data, reference_coordinates):
     print("Unique latitudes:", data['latitude'].unique())
     print("Unique longitudes:", data['longitude'].unique())
 
+    # Apply 7-day rolling mean to specified features
+    rolling_features = ['new_confirmed', 'new_deceased', 'newAdmissions', 'hospitalCases', 'covidOccupiedMVBeds']
+    data[rolling_features] = data.groupby('areaName')[rolling_features].rolling(window=7, min_periods=1).mean().reset_index(level=0, drop=True)
+    
+    # Handle any missing values after rolling
+    data[rolling_features] = data[rolling_features].fillna(0)
+    
     # Sort data chronologically by region
     data.sort_values(['areaName', 'date'], inplace=True)
-
-    # Apply 7-day rolling mean per region
-    rolling_cols = ['new_confirmed', 'new_deceased', 'newAdmissions', 'hospitalCases', 'covidOccupiedMVBeds']
-    data[rolling_cols] = data.groupby('areaName')[rolling_cols].transform(lambda x: x.rolling(window=7, min_periods=1).mean())
 
     return data
 
@@ -119,15 +121,13 @@ class NHSRegionDataset(Dataset):
         if not inconsistent_pop.empty:
             raise ValueError(f"Inconsistent population values in regions: {inconsistent_pop.index.tolist()}")
 
-        # Normalize data if scaler is provided
-        if scaler:
-            self.scaler = scaler
-            # Reshape for scaler: (num_dates*num_nodes, num_features)
-            self.feature_array = self.feature_array.reshape(-1, self.num_features)
-            self.feature_array = self.scaler.transform(self.feature_array)
-            self.feature_array = self.feature_array.reshape(self.num_dates, self.num_nodes, self.num_features)
-        else:
-            self.scaler = None
+        # Remove normalization steps
+        # if scaler:
+        #     self.scaler = scaler
+        #     self.feature_array = self.scaler.transform(self.feature_array.reshape(-1, self.num_features))
+        #     self.feature_array = self.feature_array.reshape(self.num_dates, self.num_nodes, self.num_features)
+        # else:
+        #     self.scaler = None
 
     def __len__(self):
         return self.num_dates - self.num_timesteps_input - self.num_timesteps_output + 1
@@ -332,32 +332,22 @@ class EpiGNN(nn.Module):
         temp_emb = self.backbone(X_reshaped)  # (batch_size, hidR, m)
         temp_emb = temp_emb.permute(0, 2, 1)  # (batch_size, m, hidR)
 
-        print(f"feat_emb shape: {temp_emb.shape}")  # Debugging
-
         # Global transmission risk encoding
         query = self.dropout_layer(self.WQ(temp_emb))  # (batch_size, m, hidA=32)
-        print(f"query shape after WQ: {query.shape}")  # Debugging
 
         key = self.dropout_layer(self.WK(temp_emb))    # (batch_size, m, hidA=32)
-        print(f"key shape after WK: {key.shape}")      # Debugging
 
         attn = torch.bmm(query, key.transpose(1, 2))   # (batch_size, m, m)
         attn = F.normalize(attn, dim=-1, p=2, eps=1e-12)
         attn = torch.sum(attn, dim=-1, keepdim=True)   # (batch_size, m, 1)
         t_enc = self.dropout_layer(self.t_enc(attn))   # (batch_size, m, hidR=40)
 
-        print(f"t_enc shape: {t_enc.shape}")  # Debugging
-
         # Local transmission risk encoding
         d = torch.sum(adj, dim=1).unsqueeze(2)  # (batch_size, m, 1)
         s_enc = self.dropout_layer(self.s_enc(d))  # (batch_size, m, hidR=40)
 
-        print(f"s_enc shape: {s_enc.shape}")  # Debugging
-
         # Fusion
         feat_emb = temp_emb + t_enc + s_enc  # (batch_size, m, hidR=40)
-
-        print(f"feat_emb after fusion shape: {feat_emb.shape}")  # Debugging
 
         # External information (optional)
         if self.external_parameter is not None and index is not None:
@@ -398,8 +388,6 @@ class EpiGNN(nn.Module):
         node_state = torch.cat(node_state_list, dim=-1)  # (batch_size, m, hidR * n_layer=40)
         node_state = torch.cat([node_state, feat_emb], dim=-1)  # (batch_size, m, 80)
 
-        print(f"node_state shape before output: {node_state.shape}")  # Debugging
-
         # Final prediction
         res = self.output(node_state)  # (batch_size, m, 7)
         res = res.transpose(1, 2)    # (batch_size, 7, m)
@@ -432,14 +420,14 @@ print(f"Training samples: {len(train_dataset)}")
 print(f"Validation samples: {len(val_dataset)}")
 print(f"Test samples: {len(test_dataset)}")
 
-# Initialize and fit scaler on training data
-scaler = StandardScaler()
-train_features = train_dataset.dataset.feature_array[:train_size].reshape(-1, num_features)
-scaler.fit(train_features)
+# Remove normalization steps
+# scaler = StandardScaler()
+# train_features = train_dataset.dataset.feature_array[:train_size].reshape(-1, num_features)
+# scaler.fit(train_features)
 
-# Apply scaler to all splits
-for split in [train_dataset, val_dataset, test_dataset]:
-    split.dataset.feature_array = scaler.transform(split.dataset.feature_array.reshape(-1, num_features)).reshape(split.dataset.feature_array.shape)
+# # Apply scaler to all splits
+# for split in [train_dataset, val_dataset, test_dataset]:
+#     split.dataset.feature_array = scaler.transform(split.dataset.feature_array.reshape(-1, num_features)).reshape(split.dataset.feature_array.shape)
 
 # DataLoaders
 train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, drop_last=True)
@@ -455,7 +443,30 @@ longitudes = [data[data['areaName'] == region]['longitude'].iloc[0] for region i
 
 adj = compute_geographic_adjacency(regions, latitudes, longitudes).to(device)
 print("Adjacency matrix:")
-print(adj)
+print(adj.cpu().numpy())
+
+# Plotting the geographic adjacency graph
+import networkx as nx
+
+adj_np = adj.cpu().numpy()
+
+# Create a NetworkX graph from the adjacency matrix
+G = nx.from_numpy_array(adj_np)
+
+# Assign region names as node labels
+mapping = {i: region for i, region in enumerate(regions)}
+G = nx.relabel_nodes(G, mapping)
+
+# Set positions based on geographic coordinates
+pos = {region: (longitudes[i], latitudes[i]) for i, region in enumerate(regions)}
+
+# Plot the graph
+plt.figure(figsize=(10, 8))
+nx.draw(G, pos, with_labels=True, node_size=500, node_color='skyblue', edge_color='gray')
+plt.title('Geographic Adjacency Graph')
+plt.xlabel('Longitude')
+plt.ylabel('Latitude')
+plt.show()
 
 ########################################
 # Model Initialization
@@ -594,20 +605,24 @@ print(f"Test Loss: {avg_test_loss:.4f}")
 all_preds = torch.cat(all_preds, dim=0)
 all_actuals = torch.cat(all_actuals, dim=0)
 
-# Visualize predictions vs. actuals for a few samples
-num_plots = 3
-for i in range(min(num_plots, all_preds.size(0))):
-    sample_pred = all_preds[i].numpy()
-    sample_actual = all_actuals[i].numpy()
+# Reshape tensors for inverse transformation
+all_preds_np = all_preds.cpu().numpy()
+all_actuals_np = all_actuals.cpu().numpy()
 
-    plt.figure(figsize=(12,8))
+# Proceed to plotting using the inverse-transformed data
+num_plots = 3
+for i in range(min(num_plots, all_preds_np.shape[0])):
+    sample_pred = all_preds_np[i]
+    sample_actual = all_actuals_np[i]
+
+    plt.figure(figsize=(12, 8))
     for node_idx, region in enumerate(regions):
         plt.plot(range(num_timesteps_output), sample_actual[:, node_idx], label=f'Actual - {region}')
         plt.plot(range(num_timesteps_output), sample_pred[:, node_idx], '--', label=f'Predicted - {region}')
 
     plt.xlabel('Future Timestep')
     plt.ylabel('COVID Occupied MV Beds')
-    plt.title(f'Sample {i+1}: Predictions vs Actual')
+    plt.title(f'Sample {i+1}: Predictions vs Actual (Original Scale)')
     plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
     plt.tight_layout()
     plt.show()
