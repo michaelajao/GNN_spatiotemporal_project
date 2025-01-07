@@ -623,7 +623,7 @@ model = EpiGNN(
     device=device
 ).to(device)
 
-optimizer = optim.Adam(model.parameters(), lr=learning_rate, weight_decay=1e-4)
+optimizer = optim.AdamW(model.parameters(), lr=learning_rate, weight_decay=1e-4)
 criterion = nn.MSELoss()
 
 # Learning Rate Scheduler (Plateau)
