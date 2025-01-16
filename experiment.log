@@ -15391,3 +15391,425 @@
    -9.006249    -93.616776  ]
 [2025-01-16 13:09:13] INFO: Epoch 848/1000 - Train Loss: 0.3868 | Val Loss: 7.4752 | R² per node: [  -0.48728836 -189.22314     -17.260414     -2.167723      0.67774975
    -9.006314    -93.61706   ]
+[2025-01-16 13:09:13] INFO: Epoch 849/1000 - Train Loss: 0.3723 | Val Loss: 7.4752 | R² per node: [  -0.48728824 -189.22353     -17.260315     -2.1677344     0.67774975
+   -9.006282    -93.61666   ]
+[2025-01-16 13:09:13] INFO: Saved best model checkpoint at models/experiment1/best_model.pth.
+[2025-01-16 13:09:14] INFO: Epoch 850/1000 - Train Loss: 0.3782 | Val Loss: 7.4752 | R² per node: [  -0.48728812 -189.22398     -17.260092     -2.1677487     0.67774916
+   -9.006211    -93.61568   ]
+[2025-01-16 13:09:14] INFO: Saved best model checkpoint at models/experiment1/best_model.pth.
+[2025-01-16 13:09:14] INFO: Epoch 851/1000 - Train Loss: 0.3735 | Val Loss: 7.4752 | R² per node: [  -0.48728788 -189.22394     -17.259832     -2.1677656     0.67774844
+   -9.006138    -93.61467   ]
+[2025-01-16 13:09:14] INFO: Saved best model checkpoint at models/experiment1/best_model.pth.
+[2025-01-16 13:09:14] INFO: Epoch 852/1000 - Train Loss: 0.3714 | Val Loss: 7.4752 | R² per node: [  -0.48728812 -189.22441     -17.25962      -2.1677797     0.6777475
+   -9.006056    -93.61385   ]
+[2025-01-16 13:09:14] INFO: Epoch 853/1000 - Train Loss: 0.3683 | Val Loss: 7.4752 | R² per node: [  -0.48728776 -189.22417     -17.259426     -2.1677895     0.677746
+   -9.006039    -93.613144  ]
+[2025-01-16 13:09:15] INFO: Epoch 854/1000 - Train Loss: 0.3685 | Val Loss: 7.4752 | R² per node: [  -0.48728776 -189.22371     -17.259405     -2.167795      0.6777446
+   -9.006059    -93.612946  ]
+[2025-01-16 13:09:15] INFO: Epoch 855/1000 - Train Loss: 0.3739 | Val Loss: 7.4752 | R² per node: [  -0.48728776 -189.22412     -17.259237     -2.1678083     0.6777444
+   -9.005998    -93.61222   ]
+[2025-01-16 13:09:15] INFO: Epoch 856/1000 - Train Loss: 0.3729 | Val Loss: 7.4752 | R² per node: [  -0.48728776 -189.22491     -17.259098     -2.1678226     0.6777443
+   -9.005927    -93.61162   ]
+[2025-01-16 13:09:15] INFO: Saved best model checkpoint at models/experiment1/best_model.pth.
+[2025-01-16 13:09:16] INFO: Epoch 857/1000 - Train Loss: 0.3815 | Val Loss: 7.4752 | R² per node: [  -0.48728776 -189.22423     -17.258942     -2.1678247     0.6777439
+   -9.005949    -93.610985  ]
+[2025-01-16 13:09:16] INFO: Epoch 858/1000 - Train Loss: 0.3836 | Val Loss: 7.4752 | R² per node: [  -0.48728776 -189.22394     -17.2588       -2.1678288     0.6777431
+   -9.005915    -93.6103    ]
+[2025-01-16 13:09:16] INFO: Saved best model checkpoint at models/experiment1/best_model.pth.
+[2025-01-16 13:09:16] INFO: Epoch 859/1000 - Train Loss: 0.3821 | Val Loss: 7.4752 | R² per node: [  -0.48728764 -189.22339     -17.258675     -2.1678317     0.67774224
+   -9.005898    -93.60987   ]
+[2025-01-16 13:09:16] INFO: Saved best model checkpoint at models/experiment1/best_model.pth.
+[2025-01-16 13:09:16] INFO: Epoch 860/1000 - Train Loss: 0.3823 | Val Loss: 7.4752 | R² per node: [  -0.48728764 -189.22374     -17.258556     -2.1678357     0.67774177
+   -9.005846    -93.609505  ]
+[2025-01-16 13:09:17] INFO: Epoch 861/1000 - Train Loss: 0.3727 | Val Loss: 7.4752 | R² per node: [  -0.48728764 -189.22437     -17.258396     -2.1678474     0.677741
+   -9.005792    -93.60879   ]
+[2025-01-16 13:09:17] INFO: Epoch 862/1000 - Train Loss: 0.3864 | Val Loss: 7.4752 | R² per node: [  -0.4872874 -189.22513    -17.258266    -2.167856     0.6777406
+   -9.005752   -93.60824  ]
+[2025-01-16 13:09:17] INFO: Saved best model checkpoint at models/experiment1/best_model.pth.
+[2025-01-16 13:09:17] INFO: Epoch 863/1000 - Train Loss: 0.3757 | Val Loss: 7.4752 | R² per node: [  -0.48728716 -189.22572     -17.258064     -2.1678643     0.6777403
+   -9.005673    -93.60728   ]
+[2025-01-16 13:09:17] INFO: Saved best model checkpoint at models/experiment1/best_model.pth.
+[2025-01-16 13:09:17] INFO: Epoch 864/1000 - Train Loss: 0.3853 | Val Loss: 7.4752 | R² per node: [  -0.48728716 -189.22578     -17.2579       -2.1678777     0.6777397
+   -9.005622    -93.60653   ]
+[2025-01-16 13:09:17] INFO: Saved best model checkpoint at models/experiment1/best_model.pth.
+[2025-01-16 13:09:18] INFO: Epoch 865/1000 - Train Loss: 0.3745 | Val Loss: 7.4752 | R² per node: [  -0.48728704 -189.22546     -17.257837     -2.1678867     0.6777394
+   -9.005589    -93.606224  ]
+[2025-01-16 13:09:18] INFO: Saved best model checkpoint at models/experiment1/best_model.pth.
+[2025-01-16 13:09:18] INFO: Epoch 866/1000 - Train Loss: 0.3773 | Val Loss: 7.4752 | R² per node: [  -0.48728704 -189.2249      -17.25781      -2.167889      0.67774034
+   -9.005554    -93.60614   ]
+[2025-01-16 13:09:18] INFO: Saved best model checkpoint at models/experiment1/best_model.pth.
+[2025-01-16 13:09:18] INFO: Epoch 867/1000 - Train Loss: 0.3987 | Val Loss: 7.4752 | R² per node: [  -0.48728704 -189.22508     -17.25771      -2.1678953     0.67774034
+   -9.005533    -93.60567   ]
+[2025-01-16 13:09:18] INFO: Saved best model checkpoint at models/experiment1/best_model.pth.
+[2025-01-16 13:09:19] INFO: Epoch 868/1000 - Train Loss: 0.3966 | Val Loss: 7.4752 | R² per node: [  -0.4872867  -189.23341     -17.257248     -2.167979      0.67773926
+   -9.004945    -93.603226  ]
+[2025-01-16 13:09:19] INFO: Saved best model checkpoint at models/experiment1/best_model.pth.
+[2025-01-16 13:09:19] INFO: Epoch 869/1000 - Train Loss: 0.3782 | Val Loss: 7.4752 | R² per node: [  -0.48728645 -189.23433     -17.257065     -2.1679869     0.6777394
+   -9.004931    -93.60246   ]
+[2025-01-16 13:09:19] INFO: Saved best model checkpoint at models/experiment1/best_model.pth.
+[2025-01-16 13:09:19] INFO: Epoch 870/1000 - Train Loss: 0.3801 | Val Loss: 7.4752 | R² per node: [  -0.48728633 -189.23485     -17.257069     -2.1679883     0.6777395
+   -9.004947    -93.60254   ]
+[2025-01-16 13:09:19] INFO: Saved best model checkpoint at models/experiment1/best_model.pth.
+[2025-01-16 13:09:19] INFO: Epoch 871/1000 - Train Loss: 0.3846 | Val Loss: 7.4752 | R² per node: [  -0.48728573 -189.23546     -17.256996     -2.1679924     0.67773986
+   -9.004911    -93.60207   ]
+[2025-01-16 13:09:19] INFO: Saved best model checkpoint at models/experiment1/best_model.pth.
+[2025-01-16 13:09:20] INFO: Epoch 872/1000 - Train Loss: 0.3827 | Val Loss: 7.4752 | R² per node: [  -0.48728585 -189.2355      -17.25691      -2.1679962     0.67773944
+   -9.004915    -93.60173   ]
+[2025-01-16 13:09:20] INFO: Saved best model checkpoint at models/experiment1/best_model.pth.
+[2025-01-16 13:09:20] INFO: Epoch 873/1000 - Train Loss: 0.3783 | Val Loss: 7.4752 | R² per node: [  -0.4872855 -189.23589    -17.256844    -2.1680002    0.6777402
+   -9.004882   -93.60133  ]
+[2025-01-16 13:09:20] INFO: Saved best model checkpoint at models/experiment1/best_model.pth.
+[2025-01-16 13:09:20] INFO: Epoch 874/1000 - Train Loss: 0.3800 | Val Loss: 7.4752 | R² per node: [  -0.48728538 -189.23602     -17.256704     -2.168007      0.67774016
+   -9.0048485   -93.60065   ]
+[2025-01-16 13:09:20] INFO: Saved best model checkpoint at models/experiment1/best_model.pth.
+[2025-01-16 13:09:21] INFO: Epoch 875/1000 - Train Loss: 0.3729 | Val Loss: 7.4752 | R² per node: [  -0.48728538 -189.23586     -17.25663      -2.168011      0.67773956
+   -9.004824    -93.60049   ]
+[2025-01-16 13:09:21] INFO: Saved best model checkpoint at models/experiment1/best_model.pth.
+[2025-01-16 13:09:21] INFO: Epoch 876/1000 - Train Loss: 0.3675 | Val Loss: 7.4752 | R² per node: [  -0.48728538 -189.23518     -17.256586     -2.1680098     0.677739
+   -9.004838    -93.600525  ]
+[2025-01-16 13:09:21] INFO: Epoch 877/1000 - Train Loss: 0.3817 | Val Loss: 7.4752 | R² per node: [  -0.48728514 -189.23521     -17.256409     -2.1680188     0.6777386
+   -9.004812    -93.6       ]
+[2025-01-16 13:09:21] INFO: Saved best model checkpoint at models/experiment1/best_model.pth.
+[2025-01-16 13:09:21] INFO: Epoch 878/1000 - Train Loss: 0.3676 | Val Loss: 7.4752 | R² per node: [  -0.48728514 -189.2355      -17.256227     -2.1680305     0.6777382
+   -9.004756    -93.59927   ]
+[2025-01-16 13:09:21] INFO: Saved best model checkpoint at models/experiment1/best_model.pth.
+[2025-01-16 13:09:22] INFO: Epoch 879/1000 - Train Loss: 0.3940 | Val Loss: 7.4752 | R² per node: [  -0.48728514 -189.23578     -17.256119     -2.1680334     0.6777376
+   -9.0047035   -93.598915  ]
+[2025-01-16 13:09:22] INFO: Saved best model checkpoint at models/experiment1/best_model.pth.
+[2025-01-16 13:09:22] INFO: Epoch 880/1000 - Train Loss: 0.3903 | Val Loss: 7.4752 | R² per node: [  -0.48728466 -189.23625     -17.256018     -2.168037      0.67773783
+   -9.004669    -93.598366  ]
+[2025-01-16 13:09:22] INFO: Saved best model checkpoint at models/experiment1/best_model.pth.
+[2025-01-16 13:09:22] INFO: Epoch 881/1000 - Train Loss: 0.3885 | Val Loss: 7.4752 | R² per node: [  -0.48728383 -189.23633     -17.255903     -2.1680377     0.6777382
+   -9.004619    -93.59792   ]
+[2025-01-16 13:09:22] INFO: Saved best model checkpoint at models/experiment1/best_model.pth.
+[2025-01-16 13:09:22] INFO: Epoch 882/1000 - Train Loss: 0.3792 | Val Loss: 7.4752 | R² per node: [  -0.48728383 -189.23654     -17.255856     -2.1680398     0.6777382
+   -9.004575    -93.597725  ]
+[2025-01-16 13:09:22] INFO: Saved best model checkpoint at models/experiment1/best_model.pth.
+[2025-01-16 13:09:23] INFO: Epoch 883/1000 - Train Loss: 0.3863 | Val Loss: 7.4752 | R² per node: [  -0.4872837 -189.23718    -17.255737    -2.1680543    0.6777379
+   -9.004504   -93.59728  ]
+[2025-01-16 13:09:23] INFO: Saved best model checkpoint at models/experiment1/best_model.pth.
+[2025-01-16 13:09:23] INFO: Epoch 884/1000 - Train Loss: 0.3889 | Val Loss: 7.4751 | R² per node: [  -0.4872836 -189.23755    -17.25562     -2.1680639    0.6777376
+   -9.004456   -93.5968   ]
+[2025-01-16 13:09:23] INFO: Saved best model checkpoint at models/experiment1/best_model.pth.
+[2025-01-16 13:09:23] INFO: Epoch 885/1000 - Train Loss: 0.3871 | Val Loss: 7.4751 | R² per node: [  -0.48728347 -189.23827     -17.255499     -2.1680715     0.67773795
+   -9.004399    -93.596306  ]
+[2025-01-16 13:09:23] INFO: Saved best model checkpoint at models/experiment1/best_model.pth.
+[2025-01-16 13:09:24] INFO: Epoch 886/1000 - Train Loss: 0.3771 | Val Loss: 7.4751 | R² per node: [  -0.4872836  -189.2387      -17.255463     -2.1680734     0.67773736
+   -9.004254    -93.59604   ]
+[2025-01-16 13:09:24] INFO: Saved best model checkpoint at models/experiment1/best_model.pth.
+[2025-01-16 13:09:24] INFO: Epoch 887/1000 - Train Loss: 0.3893 | Val Loss: 7.4751 | R² per node: [  -0.48728335 -189.23813     -17.255304     -2.168074      0.67773867
+   -9.004256    -93.595345  ]
+[2025-01-16 13:09:24] INFO: Saved best model checkpoint at models/experiment1/best_model.pth.
+[2025-01-16 13:09:24] INFO: Epoch 888/1000 - Train Loss: 0.3715 | Val Loss: 7.4751 | R² per node: [  -0.48728323 -189.23788     -17.255116     -2.1680784     0.6777382
+   -9.004202    -93.594635  ]
+[2025-01-16 13:09:24] INFO: Saved best model checkpoint at models/experiment1/best_model.pth.
+[2025-01-16 13:09:24] INFO: Epoch 889/1000 - Train Loss: 0.3675 | Val Loss: 7.4751 | R² per node: [  -0.48728323 -189.23784     -17.255047     -2.16808       0.67773736
+   -9.004189    -93.59445   ]
+[2025-01-16 13:09:24] INFO: Saved best model checkpoint at models/experiment1/best_model.pth.
+[2025-01-16 13:09:25] INFO: Epoch 890/1000 - Train Loss: 0.3630 | Val Loss: 7.4751 | R² per node: [  -0.48728323 -189.23734     -17.25482      -2.168095      0.6777369
+   -9.004146    -93.593445  ]
+[2025-01-16 13:09:25] INFO: Saved best model checkpoint at models/experiment1/best_model.pth.
+[2025-01-16 13:09:25] INFO: Epoch 891/1000 - Train Loss: 0.3754 | Val Loss: 7.4751 | R² per node: [  -0.487283   -189.23705     -17.2548       -2.1680942     0.67773664
+   -9.004182    -93.59341   ]
+[2025-01-16 13:09:25] INFO: Saved best model checkpoint at models/experiment1/best_model.pth.
+[2025-01-16 13:09:25] INFO: Epoch 892/1000 - Train Loss: 0.3665 | Val Loss: 7.4751 | R² per node: [  -0.487283  -189.23717    -17.254683    -2.1681004    0.6777366
+   -9.004145   -93.593056 ]
+[2025-01-16 13:09:25] INFO: Saved best model checkpoint at models/experiment1/best_model.pth.
+[2025-01-16 13:09:25] INFO: Epoch 893/1000 - Train Loss: 0.3807 | Val Loss: 7.4751 | R² per node: [  -0.48728275 -189.23723     -17.254631     -2.1681087     0.67773676
+   -9.004138    -93.59282   ]
+[2025-01-16 13:09:25] INFO: Saved best model checkpoint at models/experiment1/best_model.pth.
+[2025-01-16 13:09:26] INFO: Epoch 894/1000 - Train Loss: 0.3766 | Val Loss: 7.4751 | R² per node: [  -0.48728275 -189.23734     -17.254604     -2.1681113     0.67773706
+   -9.004144    -93.592705  ]
+[2025-01-16 13:09:26] INFO: Epoch 895/1000 - Train Loss: 0.3870 | Val Loss: 7.4751 | R² per node: [  -0.48728263 -189.23723     -17.25451      -2.168121      0.6777371
+   -9.00411     -93.59231   ]
+[2025-01-16 13:09:26] INFO: Saved best model checkpoint at models/experiment1/best_model.pth.
+[2025-01-16 13:09:26] INFO: Epoch 896/1000 - Train Loss: 0.3770 | Val Loss: 7.4751 | R² per node: [  -0.48728228 -189.23788     -17.254509     -2.1681275     0.6777376
+   -9.004087    -93.59219   ]
+[2025-01-16 13:09:26] INFO: Saved best model checkpoint at models/experiment1/best_model.pth.
+[2025-01-16 13:09:27] INFO: Epoch 897/1000 - Train Loss: 0.3891 | Val Loss: 7.4751 | R² per node: [  -0.48728204 -189.23776     -17.254322     -2.1681347     0.6777372
+   -9.00406     -93.591446  ]
+[2025-01-16 13:09:27] INFO: Saved best model checkpoint at models/experiment1/best_model.pth.
+[2025-01-16 13:09:27] INFO: Epoch 898/1000 - Train Loss: 0.3713 | Val Loss: 7.4751 | R² per node: [  -0.4872818  -189.23839     -17.254135     -2.1681452     0.67773664
+   -9.003956    -93.59079   ]
+[2025-01-16 13:09:27] INFO: Saved best model checkpoint at models/experiment1/best_model.pth.
+[2025-01-16 13:09:27] INFO: Epoch 899/1000 - Train Loss: 0.3872 | Val Loss: 7.4751 | R² per node: [  -0.48728156 -189.23909     -17.254074     -2.1681561     0.6777364
+   -9.003905    -93.590546  ]
+[2025-01-16 13:09:27] INFO: Saved best model checkpoint at models/experiment1/best_model.pth.
+[2025-01-16 13:09:27] INFO: Epoch 900/1000 - Train Loss: 0.3910 | Val Loss: 7.4751 | R² per node: [  -0.48728144 -189.23894     -17.253992     -2.1681633     0.6777358
+   -9.003914    -93.59012   ]
+[2025-01-16 13:09:27] INFO: Saved best model checkpoint at models/experiment1/best_model.pth.
+[2025-01-16 13:09:28] INFO: Epoch 901/1000 - Train Loss: 0.3733 | Val Loss: 7.4751 | R² per node: [  -0.48728144 -189.23901     -17.253855     -2.168171      0.6777357
+   -9.00386     -93.589584  ]
+[2025-01-16 13:09:28] INFO: Epoch 902/1000 - Train Loss: 0.3782 | Val Loss: 7.4751 | R² per node: [  -0.48728144 -189.23914     -17.253792     -2.1681733     0.6777358
+   -9.003837    -93.58925   ]
+[2025-01-16 13:09:28] INFO: Saved best model checkpoint at models/experiment1/best_model.pth.
+[2025-01-16 13:09:28] INFO: Epoch 903/1000 - Train Loss: 0.3816 | Val Loss: 7.4751 | R² per node: [  -0.48728108 -189.23979     -17.253632     -2.1681774     0.67773557
+   -9.00378     -93.58845   ]
+[2025-01-16 13:09:28] INFO: Saved best model checkpoint at models/experiment1/best_model.pth.
+[2025-01-16 13:09:28] INFO: Epoch 904/1000 - Train Loss: 0.3782 | Val Loss: 7.4751 | R² per node: [  -0.48728096 -189.23962     -17.25352      -2.1681788     0.6777352
+   -9.00377     -93.588     ]
+[2025-01-16 13:09:28] INFO: Saved best model checkpoint at models/experiment1/best_model.pth.
+[2025-01-16 13:09:29] INFO: Epoch 905/1000 - Train Loss: 0.3755 | Val Loss: 7.4751 | R² per node: [  -0.48728085 -189.23967     -17.25335      -2.168188      0.67773604
+   -9.003711    -93.5873    ]
+[2025-01-16 13:09:29] INFO: Saved best model checkpoint at models/experiment1/best_model.pth.
+[2025-01-16 13:09:29] INFO: Epoch 906/1000 - Train Loss: 0.3771 | Val Loss: 7.4751 | R² per node: [  -0.48728073 -189.23914     -17.253147     -2.1682005     0.67773545
+   -9.003657    -93.586395  ]
+[2025-01-16 13:09:29] INFO: Saved best model checkpoint at models/experiment1/best_model.pth.
+[2025-01-16 13:09:29] INFO: Epoch 907/1000 - Train Loss: 0.3893 | Val Loss: 7.4751 | R² per node: [  -0.48728037 -189.23918     -17.253033     -2.1682115     0.6777359
+   -9.003627    -93.58595   ]
+[2025-01-16 13:09:29] INFO: Saved best model checkpoint at models/experiment1/best_model.pth.
+[2025-01-16 13:09:30] INFO: Epoch 908/1000 - Train Loss: 0.3770 | Val Loss: 7.4751 | R² per node: [  -0.48728037 -189.23907     -17.252943     -2.1682153     0.6777357
+   -9.003617    -93.58555   ]
+[2025-01-16 13:09:30] INFO: Saved best model checkpoint at models/experiment1/best_model.pth.
+[2025-01-16 13:09:30] INFO: Epoch 909/1000 - Train Loss: 0.3731 | Val Loss: 7.4751 | R² per node: [  -0.48728037 -189.23882     -17.252953     -2.1682124     0.6777352
+   -9.003635    -93.58561   ]
+[2025-01-16 13:09:30] INFO: Saved best model checkpoint at models/experiment1/best_model.pth.
+[2025-01-16 13:09:30] INFO: Epoch 910/1000 - Train Loss: 0.3921 | Val Loss: 7.4751 | R² per node: [  -0.48728013 -189.23927     -17.252968     -2.1682146     0.67773604
+   -9.003634    -93.58574   ]
+[2025-01-16 13:09:30] INFO: Saved best model checkpoint at models/experiment1/best_model.pth.
+[2025-01-16 13:09:30] INFO: Epoch 911/1000 - Train Loss: 0.3795 | Val Loss: 7.4751 | R² per node: [  -0.48728    -189.24011     -17.252848     -2.1682236     0.67773664
+   -9.003554    -93.585304  ]
+[2025-01-16 13:09:30] INFO: Saved best model checkpoint at models/experiment1/best_model.pth.
+[2025-01-16 13:09:31] INFO: Epoch 912/1000 - Train Loss: 0.3851 | Val Loss: 7.4751 | R² per node: [  -0.48728   -189.24014    -17.25276     -2.1682267    0.6777365
+   -9.003527   -93.58507  ]
+[2025-01-16 13:09:31] INFO: Epoch 913/1000 - Train Loss: 0.3805 | Val Loss: 7.4751 | R² per node: [  -0.48728013 -189.24031     -17.252645     -2.1682377     0.6777364
+   -9.003483    -93.584625  ]
+[2025-01-16 13:09:31] INFO: Epoch 914/1000 - Train Loss: 0.3734 | Val Loss: 7.4751 | R² per node: [  -0.48728013 -189.23982     -17.252611     -2.1682377     0.6777364
+   -9.003495    -93.584526  ]
+[2025-01-16 13:09:31] INFO: Saved best model checkpoint at models/experiment1/best_model.pth.
+[2025-01-16 13:09:32] INFO: Epoch 915/1000 - Train Loss: 0.3688 | Val Loss: 7.4751 | R² per node: [  -0.48728025 -189.23987     -17.252533     -2.1682432     0.6777363
+   -9.0034895   -93.584335  ]
+[2025-01-16 13:09:32] INFO: Saved best model checkpoint at models/experiment1/best_model.pth.
+[2025-01-16 13:09:32] INFO: Epoch 916/1000 - Train Loss: 0.3768 | Val Loss: 7.4751 | R² per node: [  -0.48727977 -189.23987     -17.252493     -2.1682422     0.67773664
+   -9.003494    -93.58428   ]
+[2025-01-16 13:09:32] INFO: Saved best model checkpoint at models/experiment1/best_model.pth.
+[2025-01-16 13:09:32] INFO: Epoch 917/1000 - Train Loss: 0.3684 | Val Loss: 7.4751 | R² per node: [  -0.48727965 -189.2403      -17.252565     -2.1682363     0.6777369
+   -9.003492    -93.58467   ]
+[2025-01-16 13:09:32] INFO: Saved best model checkpoint at models/experiment1/best_model.pth.
+[2025-01-16 13:09:32] INFO: Epoch 918/1000 - Train Loss: 0.3786 | Val Loss: 7.4751 | R² per node: [  -0.48727918 -189.24109     -17.252485     -2.1682415     0.6777377
+   -9.003432    -93.584404  ]
+[2025-01-16 13:09:32] INFO: Saved best model checkpoint at models/experiment1/best_model.pth.
+[2025-01-16 13:09:33] INFO: Epoch 919/1000 - Train Loss: 0.3656 | Val Loss: 7.4751 | R² per node: [  -0.48727906 -189.24059     -17.25238      -2.1682463     0.67773783
+   -9.003419    -93.58391   ]
+[2025-01-16 13:09:33] INFO: Saved best model checkpoint at models/experiment1/best_model.pth.
+[2025-01-16 13:09:33] INFO: Epoch 920/1000 - Train Loss: 0.3769 | Val Loss: 7.4751 | R² per node: [  -0.48727906 -189.2409      -17.252253     -2.1682596     0.6777371
+   -9.003355    -93.5833    ]
+[2025-01-16 13:09:33] INFO: Epoch 921/1000 - Train Loss: 0.3823 | Val Loss: 7.4751 | R² per node: [  -0.48727882 -189.24109     -17.252153     -2.1682627     0.67773676
+   -9.003331    -93.582954  ]
+[2025-01-16 13:09:33] INFO: Saved best model checkpoint at models/experiment1/best_model.pth.
+[2025-01-16 13:09:33] INFO: Epoch 922/1000 - Train Loss: 0.3803 | Val Loss: 7.4751 | R² per node: [  -0.48727882 -189.24127     -17.252066     -2.1682703     0.6777364
+   -9.003283    -93.58267   ]
+[2025-01-16 13:09:33] INFO: Saved best model checkpoint at models/experiment1/best_model.pth.
+[2025-01-16 13:09:34] INFO: Epoch 923/1000 - Train Loss: 0.3683 | Val Loss: 7.4751 | R² per node: [  -0.48727882 -189.24141     -17.251945     -2.1682758     0.6777363
+   -9.003213    -93.58215   ]
+[2025-01-16 13:09:34] INFO: Saved best model checkpoint at models/experiment1/best_model.pth.
+[2025-01-16 13:09:34] INFO: Epoch 924/1000 - Train Loss: 0.3807 | Val Loss: 7.4751 | R² per node: [  -0.48727882 -189.24196     -17.25173      -2.1682916     0.6777359
+   -9.003097    -93.58124   ]
+[2025-01-16 13:09:34] INFO: Saved best model checkpoint at models/experiment1/best_model.pth.
+[2025-01-16 13:09:34] INFO: Epoch 925/1000 - Train Loss: 0.3889 | Val Loss: 7.4751 | R² per node: [  -0.48727846 -189.2415      -17.251545     -2.1682975     0.67773545
+   -9.003053    -93.580574  ]
+[2025-01-16 13:09:34] INFO: Saved best model checkpoint at models/experiment1/best_model.pth.
+[2025-01-16 13:09:35] INFO: Epoch 926/1000 - Train Loss: 0.3922 | Val Loss: 7.4751 | R² per node: [  -0.4872787  -189.24142     -17.251371     -2.1683044     0.67773414
+   -9.003014    -93.57997   ]
+[2025-01-16 13:09:35] INFO: Saved best model checkpoint at models/experiment1/best_model.pth.
+[2025-01-16 13:09:35] INFO: Epoch 927/1000 - Train Loss: 0.3901 | Val Loss: 7.4751 | R² per node: [  -0.48727858 -189.24232     -17.251333     -2.1683095     0.6777345
+   -9.002961    -93.57996   ]
+[2025-01-16 13:09:35] INFO: Epoch 928/1000 - Train Loss: 0.3886 | Val Loss: 7.4751 | R² per node: [  -0.48727858 -189.24268     -17.251198     -2.1683178     0.67773414
+   -9.0029125   -93.579666  ]
+[2025-01-16 13:09:35] INFO: Saved best model checkpoint at models/experiment1/best_model.pth.
+[2025-01-16 13:09:35] INFO: Epoch 929/1000 - Train Loss: 0.3699 | Val Loss: 7.4751 | R² per node: [  -0.48727858 -189.2434      -17.251072     -2.1683238     0.6777333
+   -9.002864    -93.579315  ]
+[2025-01-16 13:09:35] INFO: Saved best model checkpoint at models/experiment1/best_model.pth.
+[2025-01-16 13:09:36] INFO: Epoch 930/1000 - Train Loss: 0.3908 | Val Loss: 7.4751 | R² per node: [  -0.48727858 -189.24452     -17.250954     -2.1683304     0.6777327
+   -9.002764    -93.57884   ]
+[2025-01-16 13:09:36] INFO: Epoch 931/1000 - Train Loss: 0.3793 | Val Loss: 7.4751 | R² per node: [  -0.48727858 -189.2446      -17.25076      -2.1683397     0.67773217
+   -9.002716    -93.578125  ]
+[2025-01-16 13:09:36] INFO: Epoch 932/1000 - Train Loss: 0.3657 | Val Loss: 7.4751 | R² per node: [  -0.48727822 -189.24478     -17.250603     -2.168351      0.6777318
+   -9.0026245   -93.57756   ]
+[2025-01-16 13:09:36] INFO: Saved best model checkpoint at models/experiment1/best_model.pth.
+[2025-01-16 13:09:36] INFO: Epoch 933/1000 - Train Loss: 0.3634 | Val Loss: 7.4751 | R² per node: [  -0.48727798 -189.24553     -17.250431     -2.1683557     0.6777315
+   -9.002534    -93.57693   ]
+[2025-01-16 13:09:36] INFO: Saved best model checkpoint at models/experiment1/best_model.pth.
+[2025-01-16 13:09:37] INFO: Epoch 934/1000 - Train Loss: 0.3714 | Val Loss: 7.4751 | R² per node: [  -0.48727798 -189.24492     -17.250357     -2.16836       0.677731
+   -9.002549    -93.57666   ]
+[2025-01-16 13:09:37] INFO: Saved best model checkpoint at models/experiment1/best_model.pth.
+[2025-01-16 13:09:37] INFO: Epoch 935/1000 - Train Loss: 0.3889 | Val Loss: 7.4751 | R² per node: [  -0.48727798 -189.24458     -17.250227     -2.1683657     0.6777301
+   -9.002531    -93.57634   ]
+[2025-01-16 13:09:37] INFO: Saved best model checkpoint at models/experiment1/best_model.pth.
+[2025-01-16 13:09:37] INFO: Epoch 936/1000 - Train Loss: 0.3865 | Val Loss: 7.4751 | R² per node: [  -0.48727798 -189.24478     -17.250034     -2.168375      0.677729
+   -9.002483    -93.5757    ]
+[2025-01-16 13:09:38] INFO: Epoch 937/1000 - Train Loss: 0.3714 | Val Loss: 7.4751 | R² per node: [  -0.48727787 -189.24539     -17.250046     -2.1683774     0.677729
+   -9.0024805   -93.57584   ]
+[2025-01-16 13:09:38] INFO: Epoch 938/1000 - Train Loss: 0.3887 | Val Loss: 7.4751 | R² per node: [  -0.48727798 -189.2458      -17.249887     -2.168386      0.6777285
+   -9.002446    -93.57551   ]
+[2025-01-16 13:09:38] INFO: Epoch 939/1000 - Train Loss: 0.3666 | Val Loss: 7.4751 | R² per node: [  -0.48727787 -189.2459      -17.2498       -2.1683922     0.6777279
+   -9.002437    -93.57508   ]
+[2025-01-16 13:09:38] INFO: Epoch 940/1000 - Train Loss: 0.3812 | Val Loss: 7.4751 | R² per node: [  -0.48727787 -189.24623     -17.249624     -2.1684058     0.67772675
+   -9.002403    -93.574265  ]
+[2025-01-16 13:09:39] INFO: Epoch 941/1000 - Train Loss: 0.3577 | Val Loss: 7.4751 | R² per node: [  -0.48727775 -189.24626     -17.249414     -2.168419      0.6777258
+   -9.002342    -93.57339   ]
+[2025-01-16 13:09:39] INFO: Epoch 942/1000 - Train Loss: 0.3831 | Val Loss: 7.4751 | R² per node: [  -0.48727775 -189.24524     -17.249226     -2.1684244     0.67772496
+   -9.002396    -93.57256   ]
+[2025-01-16 13:09:39] INFO: Saved best model checkpoint at models/experiment1/best_model.pth.
+[2025-01-16 13:09:39] INFO: Epoch 943/1000 - Train Loss: 0.3834 | Val Loss: 7.4751 | R² per node: [  -0.48727763 -189.24489     -17.249207     -2.1684258     0.67772436
+   -9.0023985   -93.57258   ]
+[2025-01-16 13:09:40] INFO: Epoch 944/1000 - Train Loss: 0.3696 | Val Loss: 7.4751 | R² per node: [  -0.4872775 -189.24425    -17.249117    -2.1684318    0.6777239
+   -9.002394   -93.57231  ]
+[2025-01-16 13:09:40] INFO: Saved best model checkpoint at models/experiment1/best_model.pth.
+[2025-01-16 13:09:40] INFO: Epoch 945/1000 - Train Loss: 0.3742 | Val Loss: 7.4751 | R² per node: [  -0.4872774  -189.24303     -17.249046     -2.168432      0.67772377
+   -9.002449    -93.57212   ]
+[2025-01-16 13:09:40] INFO: Saved best model checkpoint at models/experiment1/best_model.pth.
+[2025-01-16 13:09:40] INFO: Epoch 946/1000 - Train Loss: 0.3916 | Val Loss: 7.4751 | R² per node: [  -0.48727727 -189.24191     -17.248991     -2.1684341     0.67772305
+   -9.002521    -93.5719    ]
+[2025-01-16 13:09:40] INFO: Saved best model checkpoint at models/experiment1/best_model.pth.
+[2025-01-16 13:09:40] INFO: Epoch 947/1000 - Train Loss: 0.3844 | Val Loss: 7.4751 | R² per node: [  -0.48727727 -189.2413      -17.248798     -2.168445      0.6777213
+   -9.002526    -93.57112   ]
+[2025-01-16 13:09:41] INFO: Epoch 948/1000 - Train Loss: 0.3800 | Val Loss: 7.4751 | R² per node: [  -0.48727727 -189.24135     -17.248672     -2.1684527     0.67772114
+   -9.002472    -93.5705    ]
+[2025-01-16 13:09:41] INFO: Saved best model checkpoint at models/experiment1/best_model.pth.
+[2025-01-16 13:09:41] INFO: Epoch 949/1000 - Train Loss: 0.3697 | Val Loss: 7.4751 | R² per node: [  -0.48727703 -189.24812     -17.248337     -2.1685119     0.6777204
+   -9.002144    -93.56889   ]
+[2025-01-16 13:09:41] INFO: Saved best model checkpoint at models/experiment1/best_model.pth.
+[2025-01-16 13:09:41] INFO: Epoch 950/1000 - Train Loss: 0.3732 | Val Loss: 7.4751 | R² per node: [  -0.4872769 -189.24821    -17.24819     -2.1685176    0.67772
+   -9.002105   -93.56821  ]
+[2025-01-16 13:09:41] INFO: Saved best model checkpoint at models/experiment1/best_model.pth.
+[2025-01-16 13:09:42] INFO: Epoch 951/1000 - Train Loss: 0.3758 | Val Loss: 7.4751 | R² per node: [  -0.4872768  -189.24792     -17.248055     -2.1685266     0.67771876
+   -9.002071    -93.5677    ]
+[2025-01-16 13:09:42] INFO: Saved best model checkpoint at models/experiment1/best_model.pth.
+[2025-01-16 13:09:42] INFO: Epoch 952/1000 - Train Loss: 0.3787 | Val Loss: 7.4751 | R² per node: [  -0.48727655 -189.24846     -17.247849     -2.168538      0.67771816
+   -9.002013    -93.56685   ]
+[2025-01-16 13:09:42] INFO: Saved best model checkpoint at models/experiment1/best_model.pth.
+[2025-01-16 13:09:42] INFO: Epoch 953/1000 - Train Loss: 0.3788 | Val Loss: 7.4751 | R² per node: [  -0.48727632 -189.24863     -17.247574     -2.1685503     0.6777175
+   -9.001936    -93.56575   ]
+[2025-01-16 13:09:42] INFO: Saved best model checkpoint at models/experiment1/best_model.pth.
+[2025-01-16 13:09:42] INFO: Epoch 954/1000 - Train Loss: 0.3788 | Val Loss: 7.4751 | R² per node: [  -0.48727643 -189.24852     -17.247385     -2.1685572     0.6777165
+   -9.0018835   -93.56521   ]
+[2025-01-16 13:09:43] INFO: Epoch 955/1000 - Train Loss: 0.3805 | Val Loss: 7.4751 | R² per node: [  -0.48727655 -189.2477      -17.24727      -2.1685624     0.6777152
+   -9.001902    -93.56476   ]
+[2025-01-16 13:09:43] INFO: Epoch 956/1000 - Train Loss: 0.3990 | Val Loss: 7.4751 | R² per node: [  -0.48727643 -189.24754     -17.247116     -2.1685703     0.6777142
+   -9.001909    -93.564415  ]
+[2025-01-16 13:09:43] INFO: Epoch 957/1000 - Train Loss: 0.3746 | Val Loss: 7.4751 | R² per node: [  -0.48727643 -189.24747     -17.24698      -2.1685805     0.67771363
+   -9.001886    -93.56395   ]
+[2025-01-16 13:09:43] INFO: Epoch 958/1000 - Train Loss: 0.3741 | Val Loss: 7.4751 | R² per node: [  -0.48727643 -189.24786     -17.246847     -2.1685934     0.6777129
+   -9.001845    -93.56338   ]
+[2025-01-16 13:09:44] INFO: Epoch 959/1000 - Train Loss: 0.3659 | Val Loss: 7.4751 | R² per node: [  -0.48727643 -189.24806     -17.24666      -2.1686006     0.6777121
+   -9.001782    -93.56273   ]
+[2025-01-16 13:09:44] INFO: Epoch 960/1000 - Train Loss: 0.3757 | Val Loss: 7.4751 | R² per node: [  -0.48727655 -189.24846     -17.246426     -2.1686137     0.67771125
+   -9.001692    -93.56177   ]
+[2025-01-16 13:09:44] INFO: Saved best model checkpoint at models/experiment1/best_model.pth.
+[2025-01-16 13:09:44] INFO: Epoch 961/1000 - Train Loss: 0.3823 | Val Loss: 7.4751 | R² per node: [  -0.48727667 -189.24881     -17.24629      -2.168625      0.6777108
+   -9.001646    -93.56119   ]
+[2025-01-16 13:09:44] INFO: Epoch 962/1000 - Train Loss: 0.3821 | Val Loss: 7.4751 | R² per node: [  -0.48727667 -189.24812     -17.2462       -2.1686308     0.6777106
+   -9.001646    -93.56084   ]
+[2025-01-16 13:09:45] INFO: Epoch 963/1000 - Train Loss: 0.3767 | Val Loss: 7.4751 | R² per node: [  -0.48727667 -189.24835     -17.24606      -2.1686385     0.6777105
+   -9.001608    -93.56041   ]
+[2025-01-16 13:09:45] INFO: Saved best model checkpoint at models/experiment1/best_model.pth.
+[2025-01-16 13:09:45] INFO: Epoch 964/1000 - Train Loss: 0.3773 | Val Loss: 7.4751 | R² per node: [  -0.48727667 -189.24814     -17.24607      -2.1686344     0.67771065
+   -9.001642    -93.56056   ]
+[2025-01-16 13:09:45] INFO: Saved best model checkpoint at models/experiment1/best_model.pth.
+[2025-01-16 13:09:45] INFO: Epoch 965/1000 - Train Loss: 0.3812 | Val Loss: 7.4751 | R² per node: [  -0.48727655 -189.24776     -17.246073     -2.168634      0.67771095
+   -9.001667    -93.56068   ]
+[2025-01-16 13:09:45] INFO: Saved best model checkpoint at models/experiment1/best_model.pth.
+[2025-01-16 13:09:46] INFO: Epoch 966/1000 - Train Loss: 0.3597 | Val Loss: 7.4751 | R² per node: [  -0.48727643 -189.24767     -17.245949     -2.1686394     0.67771083
+   -9.001659    -93.56032   ]
+[2025-01-16 13:09:46] INFO: Saved best model checkpoint at models/experiment1/best_model.pth.
+[2025-01-16 13:09:46] INFO: Epoch 967/1000 - Train Loss: 0.3824 | Val Loss: 7.4751 | R² per node: [  -0.48727655 -189.24881     -17.245634     -2.1686604     0.6777104
+   -9.001508    -93.55905   ]
+[2025-01-16 13:09:46] INFO: Saved best model checkpoint at models/experiment1/best_model.pth.
+[2025-01-16 13:09:46] INFO: Epoch 968/1000 - Train Loss: 0.3815 | Val Loss: 7.4751 | R² per node: [  -0.48727655 -189.24881     -17.24551      -2.1686652     0.67771035
+   -9.001466    -93.55873   ]
+[2025-01-16 13:09:46] INFO: Epoch 969/1000 - Train Loss: 0.3798 | Val Loss: 7.4751 | R² per node: [  -0.48727667 -189.24866     -17.245306     -2.1686752     0.6777097
+   -9.001405    -93.55792   ]
+[2025-01-16 13:09:47] INFO: Epoch 970/1000 - Train Loss: 0.3853 | Val Loss: 7.4751 | R² per node: [  -0.48727643 -189.24881     -17.24512      -2.1686833     0.6777098
+   -9.001365    -93.557144  ]
+[2025-01-16 13:09:47] INFO: Saved best model checkpoint at models/experiment1/best_model.pth.
+[2025-01-16 13:09:47] INFO: Epoch 971/1000 - Train Loss: 0.3872 | Val Loss: 7.4751 | R² per node: [  -0.48727643 -189.2492      -17.244967     -2.1686943     0.677709
+   -9.001304    -93.556656  ]
+[2025-01-16 13:09:47] INFO: Saved best model checkpoint at models/experiment1/best_model.pth.
+[2025-01-16 13:09:47] INFO: Epoch 972/1000 - Train Loss: 0.3812 | Val Loss: 7.4751 | R² per node: [  -0.48727632 -189.2493      -17.244877     -2.1687028     0.6777087
+   -9.001275    -93.55645   ]
+[2025-01-16 13:09:48] INFO: Epoch 973/1000 - Train Loss: 0.3812 | Val Loss: 7.4751 | R² per node: [  -0.48727632 -189.25003     -17.244743     -2.168713      0.67770857
+   -9.001236    -93.55577   ]
+[2025-01-16 13:09:48] INFO: Saved best model checkpoint at models/experiment1/best_model.pth.
+[2025-01-16 13:09:48] INFO: Epoch 974/1000 - Train Loss: 0.3764 | Val Loss: 7.4751 | R² per node: [  -0.48727608 -189.25064     -17.244665     -2.1687217     0.6777084
+   -9.001198    -93.55543   ]
+[2025-01-16 13:09:48] INFO: Saved best model checkpoint at models/experiment1/best_model.pth.
+[2025-01-16 13:09:48] INFO: Epoch 975/1000 - Train Loss: 0.3757 | Val Loss: 7.4751 | R² per node: [  -0.4872762  -189.25067     -17.244505     -2.1687288     0.67770785
+   -9.001167    -93.55479   ]
+[2025-01-16 13:09:48] INFO: Saved best model checkpoint at models/experiment1/best_model.pth.
+[2025-01-16 13:09:48] INFO: Epoch 976/1000 - Train Loss: 0.3807 | Val Loss: 7.4751 | R² per node: [  -0.48727596 -189.25005     -17.244349     -2.16874       0.6777077
+   -9.001154    -93.554085  ]
+[2025-01-16 13:09:48] INFO: Saved best model checkpoint at models/experiment1/best_model.pth.
+[2025-01-16 13:09:49] INFO: Epoch 977/1000 - Train Loss: 0.3906 | Val Loss: 7.4751 | R² per node: [  -0.48727548 -189.24696     -17.244022     -2.168754      0.67770696
+   -9.001115    -93.55269   ]
+[2025-01-16 13:09:49] INFO: Saved best model checkpoint at models/experiment1/best_model.pth.
+[2025-01-16 13:09:49] INFO: Epoch 978/1000 - Train Loss: 0.3803 | Val Loss: 7.4751 | R² per node: [  -0.48727548 -189.24646     -17.243868     -2.1687589     0.6777063
+   -9.001079    -93.552086  ]
+[2025-01-16 13:09:49] INFO: Saved best model checkpoint at models/experiment1/best_model.pth.
+[2025-01-16 13:09:49] INFO: Epoch 979/1000 - Train Loss: 0.3825 | Val Loss: 7.4751 | R² per node: [  -0.48727524 -189.24727     -17.24387      -2.1687644     0.6777054
+   -9.000947    -93.552155  ]
+[2025-01-16 13:09:49] INFO: Saved best model checkpoint at models/experiment1/best_model.pth.
+[2025-01-16 13:09:49] INFO: Epoch 980/1000 - Train Loss: 0.3802 | Val Loss: 7.4751 | R² per node: [  -0.4872749  -189.24727     -17.243711     -2.1687737     0.67770493
+   -9.000901    -93.55159   ]
+[2025-01-16 13:09:49] INFO: Saved best model checkpoint at models/experiment1/best_model.pth.
+[2025-01-16 13:09:50] INFO: Epoch 981/1000 - Train Loss: 0.3690 | Val Loss: 7.4751 | R² per node: [  -0.48727477 -189.24762     -17.24353      -2.1687832     0.6777048
+   -9.000835    -93.55079   ]
+[2025-01-16 13:09:50] INFO: Saved best model checkpoint at models/experiment1/best_model.pth.
+[2025-01-16 13:09:50] INFO: Epoch 982/1000 - Train Loss: 0.3719 | Val Loss: 7.4751 | R² per node: [  -0.48727465 -189.24759     -17.243422     -2.16879       0.6777043
+   -9.000791    -93.5505    ]
+[2025-01-16 13:09:50] INFO: Saved best model checkpoint at models/experiment1/best_model.pth.
+[2025-01-16 13:09:50] INFO: Epoch 983/1000 - Train Loss: 0.3801 | Val Loss: 7.4751 | R² per node: [  -0.4872744  -189.24773     -17.243242     -2.168804      0.67770344
+   -9.00074     -93.549835  ]
+[2025-01-16 13:09:50] INFO: Saved best model checkpoint at models/experiment1/best_model.pth.
+[2025-01-16 13:09:51] INFO: Epoch 984/1000 - Train Loss: 0.3821 | Val Loss: 7.4751 | R² per node: [  -0.4872744 -189.24823    -17.24315     -2.1688094    0.6777032
+   -9.000707   -93.54936  ]
+[2025-01-16 13:09:51] INFO: Saved best model checkpoint at models/experiment1/best_model.pth.
+[2025-01-16 13:09:51] INFO: Epoch 985/1000 - Train Loss: 0.3876 | Val Loss: 7.4751 | R² per node: [  -0.4872744 -189.24828    -17.24288     -2.1688123    0.6777029
+   -9.000745   -93.548225 ]
+[2025-01-16 13:09:51] INFO: Saved best model checkpoint at models/experiment1/best_model.pth.
+[2025-01-16 13:09:51] INFO: Epoch 986/1000 - Train Loss: 0.3816 | Val Loss: 7.4751 | R² per node: [  -0.48727453 -189.24792     -17.242743     -2.168816      0.6777017
+   -9.000729    -93.54761   ]
+[2025-01-16 13:09:51] INFO: Saved best model checkpoint at models/experiment1/best_model.pth.
+[2025-01-16 13:09:52] INFO: Epoch 987/1000 - Train Loss: 0.3660 | Val Loss: 7.4751 | R² per node: [  -0.4872744 -189.24825    -17.242592    -2.1688235    0.6777012
+   -9.000667   -93.54707  ]
+[2025-01-16 13:09:52] INFO: Epoch 988/1000 - Train Loss: 0.3659 | Val Loss: 7.4751 | R² per node: [  -0.4872744  -189.24756     -17.242548     -2.168824      0.67770165
+   -9.000672    -93.54697   ]
+[2025-01-16 13:09:52] INFO: Saved best model checkpoint at models/experiment1/best_model.pth.
+[2025-01-16 13:09:52] INFO: Epoch 989/1000 - Train Loss: 0.3817 | Val Loss: 7.4751 | R² per node: [  -0.4872744  -189.24731     -17.242523     -2.1688259     0.67770153
+   -9.000689    -93.54694   ]
+[2025-01-16 13:09:52] INFO: Saved best model checkpoint at models/experiment1/best_model.pth.
+[2025-01-16 13:09:52] INFO: Epoch 990/1000 - Train Loss: 0.3902 | Val Loss: 7.4751 | R² per node: [  -0.48727393 -189.24792     -17.242678     -2.1688273     0.67770183
+   -9.000599    -93.54749   ]
+[2025-01-16 13:09:52] INFO: Saved best model checkpoint at models/experiment1/best_model.pth.
+[2025-01-16 13:09:53] INFO: Epoch 991/1000 - Train Loss: 0.3813 | Val Loss: 7.4751 | R² per node: [  -0.4872738 -189.24805    -17.242607    -2.1688318    0.6777023
+   -9.000558   -93.54715  ]
+[2025-01-16 13:09:53] INFO: Saved best model checkpoint at models/experiment1/best_model.pth.
+[2025-01-16 13:09:53] INFO: Epoch 992/1000 - Train Loss: 0.3804 | Val Loss: 7.4751 | R² per node: [  -0.4872737  -189.24818     -17.242434     -2.1688507     0.67770207
+   -9.000508    -93.546486  ]
+[2025-01-16 13:09:53] INFO: Saved best model checkpoint at models/experiment1/best_model.pth.
+[2025-01-16 13:09:53] INFO: Epoch 993/1000 - Train Loss: 0.3751 | Val Loss: 7.4751 | R² per node: [  -0.4872737 -189.24734    -17.242258    -2.1688585    0.6777013
+   -9.0005045  -93.545815 ]
+[2025-01-16 13:09:53] INFO: Saved best model checkpoint at models/experiment1/best_model.pth.
+[2025-01-16 13:09:54] INFO: Epoch 994/1000 - Train Loss: 0.3776 | Val Loss: 7.4751 | R² per node: [  -0.4872737 -189.2475     -17.242168    -2.1688693    0.6777019
+   -9.000469   -93.54551  ]
+[2025-01-16 13:09:54] INFO: Saved best model checkpoint at models/experiment1/best_model.pth.
+[2025-01-16 13:09:54] INFO: Epoch 995/1000 - Train Loss: 0.3629 | Val Loss: 7.4751 | R² per node: [  -0.4872737  -189.24785     -17.241987     -2.1688821     0.67770207
+   -9.000343    -93.54484   ]
+[2025-01-16 13:09:54] INFO: Saved best model checkpoint at models/experiment1/best_model.pth.
+[2025-01-16 13:09:54] INFO: Epoch 996/1000 - Train Loss: 0.3705 | Val Loss: 7.4751 | R² per node: [  -0.48727357 -189.2484      -17.241879     -2.1688924     0.67770237
+   -9.000262    -93.54442   ]
+[2025-01-16 13:09:54] INFO: Saved best model checkpoint at models/experiment1/best_model.pth.
+[2025-01-16 13:09:54] INFO: Epoch 997/1000 - Train Loss: 0.3719 | Val Loss: 7.4751 | R² per node: [  -0.48727357 -189.24869     -17.241837     -2.1688964     0.6777026
+   -9.000259    -93.544304  ]
+[2025-01-16 13:09:55] INFO: Epoch 998/1000 - Train Loss: 0.3749 | Val Loss: 7.4751 | R² per node: [  -0.48727322 -189.24832     -17.241755     -2.168902      0.6777023
+   -9.000242    -93.54388   ]
+[2025-01-16 13:09:55] INFO: Saved best model checkpoint at models/experiment1/best_model.pth.
+[2025-01-16 13:09:55] INFO: Epoch 999/1000 - Train Loss: 0.3728 | Val Loss: 7.4751 | R² per node: [  -0.48727298 -189.24886     -17.241703     -2.168908      0.6777023
+   -9.000212    -93.5437    ]
+[2025-01-16 13:09:55] INFO: Saved best model checkpoint at models/experiment1/best_model.pth.
+[2025-01-16 13:09:55] INFO: Epoch 1000/1000 - Train Loss: 0.3744 | Val Loss: 7.4751 | R² per node: [  -0.48727286 -189.24844     -17.241693     -2.1689103     0.67770207
+   -9.00022     -93.543785  ]
+[2025-01-16 13:09:55] INFO: Saved best model checkpoint at models/experiment1/best_model.pth.
+[2025-01-16 13:09:56] INFO: Loss curves saved to figures/training_validation_loss_experiment1_static.png
+[2025-01-16 13:09:56] INFO: Experiment 1 - Test Loss (MSE): 0.0393
+[2025-01-16 13:09:56] INFO: Metrics saved to results/metrics/metrics_experiment1_static.csv
