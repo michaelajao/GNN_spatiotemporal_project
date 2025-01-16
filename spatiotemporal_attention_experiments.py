@@ -829,7 +829,7 @@ def initialize_model():
 # 9. Training & Evaluation Function
 # ==============================================================================
 def run_experiment(adjacency_type='hybrid', experiment_id=1, summary_metrics=None,
-                  train_loader=None, val_loader=None, test_loader=None, adj_static=None, scaled_dataset=None):
+                  train_loader=None, val_loader=None, test_loader=None, adj_static=None, scaled_dataset=None, regions=None):
     """
     Run a full training/validation/testing cycle for the enhanced EpiGNN model.
 
@@ -851,11 +851,13 @@ def run_experiment(adjacency_type='hybrid', experiment_id=1, summary_metrics=Non
         Static adjacency matrix.
     scaled_dataset : NHSRegionDataset
         The scaled dataset containing the scaler.
+    regions : list
+        List of region names.
     """
     if summary_metrics is None:
         summary_metrics = []
 
-    logging.info(f"Starting Experiment {experiment_id} with {adjacency_type.capitalize()} Adjacency.")
+
 
     model, optimizer, criterion, scheduler = initialize_model()
 
@@ -1353,7 +1355,8 @@ def main():
             val_loader=val_loader,
             test_loader=test_loader,
             adj_static=adj_static,  # Pass adj_static here
-            scaled_dataset=scaled_dataset  # Pass scaled_dataset here
+            scaled_dataset=scaled_dataset,  # Pass scaled_dataset here
+            regions=regions  # Pass regions here
         )
 
     # Summarize results
@@ -1424,6 +1427,10 @@ def main():
 
 
     plot_summary_metrics(summary_pivot)
+    plot_summary_metrics(summary_pivot)
+
+if __name__ == "__main__":
+    main()
 
 if __name__ == "__main__":
     main()
