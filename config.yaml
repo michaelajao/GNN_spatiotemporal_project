@@ -1,0 +1,19 @@
+data:
+  csv_path: "data/merged_nhs_covid_data.csv"
+model:
+  num_nodes: 7
+  num_features: 5
+  num_timesteps_input: 14
+  num_timesteps_output: 7
+  k: 8
+  hidA: 32
+  hidR: 40
+  hidP: 1
+  n_layer: 3
+  dropout: 0.5
+training:
+  learning_rate: 1e-4
+  num_epochs: 1000
+  batch_size: 32
+  threshold_distance: 300
+  early_stopping_patience: 20

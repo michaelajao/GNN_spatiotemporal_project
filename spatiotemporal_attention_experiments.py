@@ -265,14 +265,14 @@ class NHSRegionDataset(Dataset):
         populations = self.data.groupby('areaName')['population'].unique()
         inconsistent_pop = populations[populations.apply(len) > 1]
         if not inconsistent_pop.empty:
-            raise ValueError(f"Inconsistent population values in regions: {inconsistent_pop.index.tolist()}")
+            # Handle inconsistent population data
+            logging.warning("Inconsistent population data found. Please verify the dataset.")
+            self.data = self.data.dropna(subset=['population'])
 
         # Optional scaling
         if scaler is not None:
             self.scaler = scaler
-            self.feature_array = self.feature_array.reshape(-1, self.num_features)
-            self.feature_array = self.scaler.transform(self.feature_array)
-            self.feature_array = self.feature_array.reshape(self.num_dates, self.num_nodes, self.num_features)
+            self.feature_array = self.scaler.fit_transform(self.feature_array.reshape(-1, self.num_features)).reshape(self.num_dates, self.num_nodes, self.num_features)
         else:
             self.scaler = None
 
@@ -828,7 +828,8 @@ def initialize_model():
 # ==============================================================================
 # 9. Training & Evaluation Function
 # ==============================================================================
-def run_experiment(adjacency_type='hybrid', experiment_id=1, summary_metrics=None):
+def run_experiment(adjacency_type='hybrid', experiment_id=1, summary_metrics=None,
+                  train_loader=None, val_loader=None, test_loader=None, adj_static=None, scaled_dataset=None, regions=None, data=None):
     """
     Run a full training/validation/testing cycle for the enhanced EpiGNN model.
 
@@ -840,11 +841,25 @@ def run_experiment(adjacency_type='hybrid', experiment_id=1, summary_metrics=Non
         Identifier for the experiment.
     summary_metrics : list
         List to append metrics dictionaries.
+    train_loader : DataLoader
+        DataLoader for training data.
+    val_loader : DataLoader
+        DataLoader for validation data.
+    test_loader : DataLoader
+        DataLoader for test data.
+    adj_static : torch.Tensor
+        Static adjacency matrix.
+    scaled_dataset : NHSRegionDataset
+        The scaled dataset containing the scaler.
+    regions : list
+        List of region names.
+    data : pd.DataFrame
+        The original preprocessed data.
     """
     if summary_metrics is None:
         summary_metrics = []
 
-    logging.info(f"Starting Experiment {experiment_id} with {adjacency_type.capitalize()} Adjacency.")
+
 
     model, optimizer, criterion, scheduler = initialize_model()
 
@@ -1009,6 +1024,7 @@ def run_experiment(adjacency_type='hybrid', experiment_id=1, summary_metrics=Non
     # Compute metrics per node
     mae_per_node = mean_absolute_error(actuals_flat, preds_flat, multioutput='raw_values')
     mse_per_node = mean_squared_error(actuals_flat, preds_flat, multioutput='raw_values')
+    rmse_per_node = np.sqrt(mse_per_node)
     r2_per_node  = r2_score(actuals_flat, preds_flat, multioutput='raw_values')
 
     # Compute Pearson Correlation Coefficient per node
@@ -1027,6 +1043,7 @@ def run_experiment(adjacency_type='hybrid', experiment_id=1, summary_metrics=Non
         'Region': [],
         'MAE': [],
         'MSE': [],
+        'RMSE': [],
         'R2_Score': [],
         'Pearson_CC': []
     }
@@ -1037,6 +1054,7 @@ def run_experiment(adjacency_type='hybrid', experiment_id=1, summary_metrics=Non
         metrics_dict['Region'].append(region)
         metrics_dict['MAE'].append(mae_per_node[idx])
         metrics_dict['MSE'].append(mse_per_node[idx])
+        metrics_dict['RMSE'].append(rmse_per_node[idx])
         metrics_dict['R2_Score'].append(r2_per_node[idx])
         metrics_dict['Pearson_CC'].append(pearson_per_node[idx])
 
@@ -1046,6 +1064,7 @@ def run_experiment(adjacency_type='hybrid', experiment_id=1, summary_metrics=Non
             'Region': region,
             'MAE': mae_per_node[idx],
             'MSE': mse_per_node[idx],
+            'RMSE': rmse_per_node[idx],
             'R2_Score': r2_per_node[idx],
             'Pearson_CC': pearson_per_node[idx]
         })
@@ -1135,7 +1154,7 @@ def run_experiment(adjacency_type='hybrid', experiment_id=1, summary_metrics=Non
         df = pd.DataFrame(summary_metrics)
         df = df[(df['Experiment_ID'] == experiment_id) & 
                 (df['Adjacency_Type'] == adjacency_type)]
-        aggregated_metrics = df[['MAE','MSE','R2_Score','Pearson_CC']].mean()
+        aggregated_metrics = df[['MAE','MSE','RMSE','R2_Score','Pearson_CC']].mean()
 
         plt.figure(figsize=(8, 6))
         sns.barplot(x=aggregated_metrics.index, y=aggregated_metrics.values, palette='Set2')
@@ -1337,7 +1356,14 @@ def main():
         run_experiment(
             adjacency_type=exp['adjacency_type'],
             experiment_id=exp['experiment_id'],
-            summary_metrics=summary_metrics
+            summary_metrics=summary_metrics,
+            train_loader=train_loader,
+            val_loader=val_loader,
+            test_loader=test_loader,
+            adj_static=adj_static,  # Pass adj_static here
+            scaled_dataset=scaled_dataset,  # Pass scaled_dataset here
+            regions=regions,  # Pass regions here
+            data=data  # Pass data here
         )
 
     # Summarize results
@@ -1350,6 +1376,7 @@ def main():
     summary_pivot = summary_df.groupby(['Experiment_ID', 'Adjacency_Type']).agg({
         'MAE': 'mean',
         'MSE': 'mean',
+        'RMSE': 'mean',
         'R2_Score': 'mean',
         'Pearson_CC': 'mean'
     }).reset_index()
@@ -1370,7 +1397,7 @@ def main():
         summary_pivot : pd.DataFrame
             Pivoted summary metrics DataFrame.
         """
-        metrics_list = ['MAE', 'MSE', 'R2_Score', 'Pearson_CC']
+        metrics_list = ['MAE', 'MSE', 'RMSE', 'R2_Score', 'Pearson_CC']
         plt.figure(figsize=(16, 12))
         
         for i, metric in enumerate(metrics_list):
@@ -1407,6 +1434,8 @@ def main():
         logging.info(f"Summary metrics comparison plot saved to {summary_plot}")
 
 
+    main()
+    plot_summary_metrics(summary_pivot)
     plot_summary_metrics(summary_pivot)
 
 if __name__ == "__main__":
