@@ -828,7 +828,8 @@ def initialize_model():
 # ==============================================================================
 # 9. Training & Evaluation Function
 # ==============================================================================
-def run_experiment(adjacency_type='hybrid', experiment_id=1, summary_metrics=None):
+def run_experiment(adjacency_type='hybrid', experiment_id=1, summary_metrics=None,
+                  train_loader=None, val_loader=None, test_loader=None, adj_static=None, scaled_dataset=None):
     """
     Run a full training/validation/testing cycle for the enhanced EpiGNN model.
 
@@ -840,6 +841,16 @@ def run_experiment(adjacency_type='hybrid', experiment_id=1, summary_metrics=Non
         Identifier for the experiment.
     summary_metrics : list
         List to append metrics dictionaries.
+    train_loader : DataLoader
+        DataLoader for training data.
+    val_loader : DataLoader
+        DataLoader for validation data.
+    test_loader : DataLoader
+        DataLoader for test data.
+    adj_static : torch.Tensor
+        Static adjacency matrix.
+    scaled_dataset : NHSRegionDataset
+        The scaled dataset containing the scaler.
     """
     if summary_metrics is None:
         summary_metrics = []
@@ -1337,7 +1348,12 @@ def main():
         run_experiment(
             adjacency_type=exp['adjacency_type'],
             experiment_id=exp['experiment_id'],
-            summary_metrics=summary_metrics
+            summary_metrics=summary_metrics,
+            train_loader=train_loader,
+            val_loader=val_loader,
+            test_loader=test_loader,
+            adj_static=adj_static,  # Pass adj_static here
+            scaled_dataset=scaled_dataset  # Pass scaled_dataset here
         )
 
     # Summarize results

@@ -91,10 +91,12 @@ num_timesteps_input = 14
 num_timesteps_output = 7
 
 # Temporal Graph Transformer specific hyperparameters
-d_model = 64
-nhead = 4
-num_layers = 2
-dropout = 0.1
+hyperparams = {
+    'd_model': 64,
+    'nhead': 4,
+    'num_layers': 2,
+    'dropout': 0.1
+}
 
 learning_rate = 1e-4
 num_epochs = 1000
