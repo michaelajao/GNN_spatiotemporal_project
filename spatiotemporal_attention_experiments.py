@@ -89,7 +89,7 @@ RANDOM_SEED = 123
 def seed_torch(seed=RANDOM_SEED):
     """
     Sets the random seed for reproducibility.
-    
+
     Parameters:
     -----------
     seed : int
@@ -154,14 +154,14 @@ def load_and_correct_data(data: pd.DataFrame,
     """
     Assign correct (latitude, longitude) for each region, apply a 7-day rolling 
     average to certain features, and sort chronologically.
-    
+
     Parameters:
     -----------
     data : pd.DataFrame
         Raw data.
     reference_coordinates : dict
         Mapping of region names to their (latitude, longitude).
-    
+
     Returns:
     --------
     data : pd.DataFrame
@@ -224,7 +224,7 @@ class NHSRegionDataset(Dataset):
                  scaler: object = None):
         """
         Initializes the NHSRegionDataset.
-        
+
         Parameters:
         -----------
         data : pd.DataFrame
@@ -262,16 +262,20 @@ class NHSRegionDataset(Dataset):
         self.feature_array = self.pivot.values.reshape(self.num_dates, self.num_nodes, self.num_features)
 
         # Check population consistency
-        populations = self.data.groupby('areaName')['population'].unique()
-        inconsistent_pop = populations[populations.apply(len) > 1]
-        if not inconsistent_pop.empty:
-            # Handle inconsistent population data
-            logging.warning("Inconsistent population data found. Please verify the dataset.")
-            self.data = self.data.dropna(subset=['population'])
+        if 'population' in self.data.columns:
+            populations = self.data.groupby('areaName')['population'].unique()
+            inconsistent_pop = populations[populations.apply(len) > 1]
+            if not inconsistent_pop.empty:
+                # Handle inconsistent population data
+                logging.warning("Inconsistent population data found. Please verify the dataset.")
+                self.data = self.data.dropna(subset=['population'])
+        else:
+            logging.warning("'population' column not found in data.")
 
         # Optional scaling
         if scaler is not None:
             self.scaler = scaler
+            # Reshape for scaling: (num_dates * num_nodes, num_features)
             self.feature_array = self.scaler.fit_transform(self.feature_array.reshape(-1, self.num_features)).reshape(self.num_dates, self.num_nodes, self.num_features)
         else:
             self.scaler = None
@@ -522,10 +526,10 @@ class GraphAttnLayer(nn.Module):
         attention = torch.where(adj > 0, e, zero_vec)
 
         # Softmax normalization
-        alpha = F.softmax(attention, dim=-1)  # (B, m, m)
+        alpha_attn = F.softmax(attention, dim=-1)  # (B, m, m)
 
         # Weighted sum of neighbor features
-        h_prime = torch.bmm(alpha, h)  # (B, m, out_features)
+        h_prime = torch.bmm(alpha_attn, h)  # (B, m, out_features)
 
         return F.elu(h_prime)
 
@@ -697,7 +701,7 @@ class SpatiotemporalAttnEpiGNN(nn.Module):
         t_enc = self.dropout_layer(self.t_enc(attn))  # (B, m, hidR)
 
         # Spatial encoding
-        d = torch.sum(adj, dim=2, keepdim=True)  # Corrected: (B, m, 1)
+        d = torch.sum(adj, dim=2, keepdim=True)  # (B, m, 1)
         s_enc = self.dropout_layer(self.s_enc(d))  # (B, m, hidR)
 
         # Feature Embedding
@@ -712,9 +716,10 @@ class SpatiotemporalAttnEpiGNN(nn.Module):
         elif adjacency_type == 'dynamic':
             combined_adj = learned_adj
         elif adjacency_type == 'hybrid':
-            d_mat = torch.sum(adj, dim=1, keepdim=True) * torch.sum(adj, dim=2, keepdim=True)
-            d_mat = torch.sigmoid(self.d_gate * d_mat)
-            spatial_adj = d_mat * adj
+            # Compute spatial adjacency
+            d_mat = torch.sum(adj, dim=1, keepdim=True) * torch.sum(adj, dim=2, keepdim=True)  # (B, m, m)
+            d_mat = torch.sigmoid(self.d_gate.unsqueeze(0) * d_mat)  # Broadcasting d_gate to (1, m, m)
+            spatial_adj = d_mat * adj  # (B, m, m)
             combined_adj = torch.clamp(learned_adj + spatial_adj, 0, 1)
         else:
             raise ValueError("adjacency_type must be 'static', 'dynamic', or 'hybrid'.")
@@ -790,7 +795,7 @@ def visualize_adjacency(adj_matrix: torch.Tensor, regions: list, latitudes: list
 def initialize_model():
     """
     Initializes the SpatiotemporalAttnEpiGNN model along with optimizer, loss, and scheduler.
-    
+
     Returns:
     --------
     model : nn.Module
@@ -829,7 +834,9 @@ def initialize_model():
 # 9. Training & Evaluation Function
 # ==============================================================================
 def run_experiment(adjacency_type='hybrid', experiment_id=1, summary_metrics=None,
-                  train_loader=None, val_loader=None, test_loader=None, adj_static=None, scaled_dataset=None, regions=None, data=None):
+                  train_loader=None, val_loader=None, test_loader=None, adj_static=None,
+                  scaled_dataset=None, regions=None, data=None, test_subset=None,
+                  train_size=None, val_size=None):
     """
     Run a full training/validation/testing cycle for the enhanced EpiGNN model.
 
@@ -855,11 +862,15 @@ def run_experiment(adjacency_type='hybrid', experiment_id=1, summary_metrics=Non
         List of region names.
     data : pd.DataFrame
         The original preprocessed data.
+    test_subset : Subset
+        Subset of the dataset used for testing.
+    train_size : int
+        Number of training samples.
+    val_size : int
+        Number of validation samples.
     """
     if summary_metrics is None:
         summary_metrics = []
-
-
 
     model, optimizer, criterion, scheduler = initialize_model()
 
@@ -972,8 +983,9 @@ def run_experiment(adjacency_type='hybrid', experiment_id=1, summary_metrics=Non
     plt.show()
     logging.info(f"Loss curves saved to {loss_plot_path}")
 
-    # Load best model for testing
-    model.load_state_dict(torch.load(f'models/experiment{experiment_id}/best_model.pth', map_location=device))
+    # Load best model for testing with weights_only=True to address FutureWarning
+    model.load_state_dict(torch.load(f'models/experiment{experiment_id}/best_model.pth', 
+                                     map_location=device, weights_only=True))
     model.eval()
 
     # Testing
@@ -1080,7 +1092,7 @@ def run_experiment(adjacency_type='hybrid', experiment_id=1, summary_metrics=Non
     num_test_samples = len(test_subset)
 
     for i in range(num_test_samples):
-        pred_start_idx = len(train_subset) + len(val_subset) + i + NUM_TIMESTEPS_INPUT
+        pred_start_idx = train_size + val_size + i + NUM_TIMESTEPS_INPUT
         pred_end_idx   = pred_start_idx + NUM_TIMESTEPS_OUTPUT
         if pred_end_idx > len(unique_dates):
             pred_end_idx = len(unique_dates)
@@ -1089,6 +1101,15 @@ def run_experiment(adjacency_type='hybrid', experiment_id=1, summary_metrics=Non
             last_date = unique_dates[-1]
             sample_dates = np.append(sample_dates, [last_date] * (NUM_TIMESTEPS_OUTPUT - len(sample_dates)))
         forecast_dates.extend(sample_dates)
+
+    # Ensure forecast_dates length matches all_preds_np
+    expected_length = all_preds_np.shape[0] * NUM_TIMESTEPS_OUTPUT
+    if len(forecast_dates) < expected_length:
+        # Pad with the last available date
+        last_date = unique_dates[-1]
+        forecast_dates.extend([last_date] * (expected_length - len(forecast_dates)))
+    elif len(forecast_dates) > expected_length:
+        forecast_dates = forecast_dates[:expected_length]
 
     # Build DataFrames for plotting
     preds_df = pd.DataFrame(all_preds_np.reshape(-1, NUM_NODES), columns=regions)
@@ -1140,7 +1161,7 @@ def run_experiment(adjacency_type='hybrid', experiment_id=1, summary_metrics=Non
     # Overall Metrics Plot
     def plot_overall_metrics(summary_metrics, experiment_id, adjacency_type):
         """
-        Aggregates and plots overall metrics (MAE, MSE, R2, PCC) across all regions.
+        Aggregates and plots overall metrics (MAE, MSE, RMSE, R2, Pearson_CC) across all regions.
 
         Parameters:
         -----------
@@ -1156,7 +1177,7 @@ def run_experiment(adjacency_type='hybrid', experiment_id=1, summary_metrics=Non
                 (df['Adjacency_Type'] == adjacency_type)]
         aggregated_metrics = df[['MAE','MSE','RMSE','R2_Score','Pearson_CC']].mean()
 
-        plt.figure(figsize=(8, 6))
+        plt.figure(figsize=(10, 8))
         sns.barplot(x=aggregated_metrics.index, y=aggregated_metrics.values, palette='Set2')
         plt.title(f'Overall Metrics (Averaged) - Experiment {experiment_id} ({adjacency_type.capitalize()})')
         plt.ylabel('Metric Value')
@@ -1363,7 +1384,10 @@ def main():
             adj_static=adj_static,  # Pass adj_static here
             scaled_dataset=scaled_dataset,  # Pass scaled_dataset here
             regions=regions,  # Pass regions here
-            data=data  # Pass data here
+            data=data,  # Pass data here
+            test_subset=test_subset,  # Pass test_subset here
+            train_size=train_size,  # Pass train_size here
+            val_size=val_size       # Pass val_size here
         )
 
     # Summarize results
@@ -1398,13 +1422,17 @@ def main():
             Pivoted summary metrics DataFrame.
         """
         metrics_list = ['MAE', 'MSE', 'RMSE', 'R2_Score', 'Pearson_CC']
-        plt.figure(figsize=(16, 12))
+        plt.figure(figsize=(20, 12))
+        
+        # Determine grid size based on number of metrics
+        num_metrics = len(metrics_list)
+        cols = 3
+        rows = math.ceil(num_metrics / cols)
         
         for i, metric in enumerate(metrics_list):
-            plt.subplot(2, 2, i+1)
+            plt.subplot(rows, cols, i+1)
             
-            # Handle Seaborn palette without hue by using a single color
-            sns.barplot(x='Adjacency_Type', y=metric, data=summary_pivot, color='skyblue', dodge=False)
+            sns.barplot(x='Adjacency_Type', y=metric, data=summary_pivot, palette='Set2')
             
             plt.title(f'Average {metric}')
             plt.ylabel(metric)
@@ -1413,17 +1441,15 @@ def main():
             # Dynamic y-axis limits
             min_val = summary_pivot[metric].min()
             max_val = summary_pivot[metric].max()
-            if min_val < 0:
-                plt.ylim(min_val * 1.2, max(max_val, 1) * 1.2)
+            if metric in ['R2_Score', 'Pearson_CC']:
+                plt.ylim(min(-1, min_val * 1.2), max(1, max_val * 1.2))
             else:
                 plt.ylim(0, max(max_val, 1) * 1.2)
             
             # Text annotations with safe y positions
             for idx, row in summary_pivot.iterrows():
-                x_pos = idx % len(summary_pivot)
-                y_pos = row[metric] + 0.01 * row[metric]
-                y_min, y_max = plt.ylim()
-                y_pos = max(y_pos, y_min + 0.01 * (y_max - y_min))
+                x_pos = list(summary_pivot['Adjacency_Type']).index(row['Adjacency_Type'])
+                y_pos = row[metric] + 0.01 * max_val
                 plt.text(x_pos, y_pos, f"{row[metric]:.4f}",
                         ha='center', va='bottom', fontsize=10)
             
@@ -1433,9 +1459,6 @@ def main():
         plt.show()
         logging.info(f"Summary metrics comparison plot saved to {summary_plot}")
 
-
-    main()
-    plot_summary_metrics(summary_pivot)
     plot_summary_metrics(summary_pivot)
 
 if __name__ == "__main__":

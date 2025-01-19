@@ -1,7 +1,8 @@
-# ==============================================================================
-# Enhanced EpiGNN Implementation with Advanced Attention and Dynamic Adjacency Updates
-# ==============================================================================
+#!/usr/bin/env python3
 """
+Enhanced EpiGNN Implementation with Advanced Attention and Dynamic Adjacency Updates
+=====================================================================================
+
 This script implements an enhanced version of the EpiGNN model for forecasting COVID-19 
 occupied mechanical ventilation (MV) beds across UK regions. 
 
@@ -56,50 +57,77 @@ sns.set(style="whitegrid")
 plt.rcParams.update({'figure.max_open_warning': 0})
 
 # ==============================================================================
-# 1. Random Seed & Device Configuration
+# 1. Logging Configuration
+# ==============================================================================
+import logging
+
+def setup_logging():
+    """
+    Configures the logging settings.
+    Logs are saved to 'experiment.log' and also output to the console.
+    """
+    logging.basicConfig(
+        level=logging.INFO,
+        format='[%(asctime)s] %(levelname)s: %(message)s',
+        datefmt='%Y-%m-%d %H:%M:%S',
+        handlers=[
+            logging.FileHandler("experiment.log"),
+            logging.StreamHandler()
+        ]
+    )
+
+setup_logging()
+
+# ==============================================================================
+# 2. Random Seed & Device Configuration
 # ==============================================================================
 RANDOM_SEED = 123
 
-def seed_torch(seed=RANDOM_SEED):
+def seed_everything(seed=RANDOM_SEED):
     """
-    Fix the random seed for reproducibility across numpy, torch, etc.
+    Sets the random seed for reproducibility.
     """
     random.seed(seed)
     os.environ['PYTHONHASHSEED'] = str(seed)
     np.random.seed(seed)
     torch.manual_seed(seed)
     torch.cuda.manual_seed(seed)
-    torch.cuda.manual_seed_all(seed)
+    torch.cuda.manual_seed_all(seed)  # if using multi-GPU
     torch.backends.cudnn.benchmark = False
     torch.backends.cudnn.deterministic = True
 
-seed_torch()
+seed_everything()
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-print(f"[Info] Using device: {device}")
+logging.info(f"Using device: {device}")
 
 # ==============================================================================
-# 2. Hyperparameters (Adjusted for Multi-Head GAT)
+# 3. Hyperparameters (Adjusted for Multi-Head GAT)
 # ==============================================================================
-num_nodes = 7
-num_features = 5  # [new_confirmed, new_deceased, newAdmissions, hospitalCases, covidOccupiedMVBeds]
-num_timesteps_input = 14
-num_timesteps_output = 7
-k = 8             # Convolution channels (example)
-hidA = 32         # Dimension for Q/K transformations
-hidR = 40         # Dimension for the GNN blocks
-hidP = 1
-n_layer = 3       # Number of GAT layers
-num_heads = 4     # Number of attention heads
-dropout = 0.5
-learning_rate = 1e-3
-num_epochs = 1000
-batch_size = 32
-threshold_distance = 300  # km threshold for adjacency
-early_stopping_patience = 20
+# Data Parameters
+NUM_NODES = 7
+NUM_FEATURES = 5  # [new_confirmed, new_deceased, newAdmissions, hospitalCases, covidOccupiedMVBeds]
+NUM_TIMESTEPS_INPUT = 14
+NUM_TIMESTEPS_OUTPUT = 7
+
+# Model Parameters
+K = 8             # Convolution channels (example)
+HID_A = 32        # Dimension for Q/K transformations
+HID_R = 40        # Dimension for the GNN blocks
+HID_P = 1
+N_LAYER = 3       # Number of GAT layers
+NUM_HEADS = 4     # Number of attention heads
+DROPOUT = 0.5
+
+# Training Parameters
+LEARNING_RATE = 1e-3
+NUM_EPOCHS = 1000
+BATCH_SIZE = 32
+THRESHOLD_DISTANCE = 300  # km threshold for adjacency
+EARLY_STOPPING_PATIENCE = 20
 
 # ==============================================================================
-# 3. Reference Coordinates
+# 4. Reference Coordinates
 # ==============================================================================
 REFERENCE_COORDINATES = {
     "East of England": (52.1766, 0.425889),
@@ -112,7 +140,7 @@ REFERENCE_COORDINATES = {
 }
 
 # ==============================================================================
-# 4. Data Loading and Preprocessing
+# 5. Data Loading and Preprocessing
 # ==============================================================================
 def load_and_correct_data(data: pd.DataFrame,
                           reference_coordinates: dict) -> pd.DataFrame:
@@ -141,6 +169,7 @@ def load_and_correct_data(data: pd.DataFrame,
     
     # Ensure data is sorted by areaName and date
     data.sort_values(['areaName', 'date'], inplace=True)
+    logging.info("Data loaded and preprocessed successfully.")
     return data
 
 class NHSRegionDataset(Dataset):
@@ -156,11 +185,18 @@ class NHSRegionDataset(Dataset):
                  num_timesteps_output: int,
                  scaler: object = None):
         """
-        data: preprocessed DataFrame containing columns:
-              ['date', 'areaName', 'latitude', 'longitude', 'population', 'new_confirmed', etc.]
-        num_timesteps_input: length of input window
-        num_timesteps_output: length of output horizon
-        scaler: optional StandardScaler (or similar) for normalization
+        Initializes the NHSRegionDataset.
+
+        Parameters:
+        -----------
+        data : pd.DataFrame
+            The preprocessed data.
+        num_timesteps_input : int
+            Number of input timesteps.
+        num_timesteps_output : int
+            Number of output timesteps.
+        scaler : StandardScaler or None
+            Scaler object for feature normalization.
         """
         super().__init__()
         self.data = data.copy()
@@ -192,17 +228,21 @@ class NHSRegionDataset(Dataset):
         self.feature_array = self.pivot.values.reshape(self.num_dates, self.num_nodes, self.num_features)
 
         # Optional check for population consistency
-        populations = self.data.groupby('areaName')['population'].unique()
-        inconsistent_pop = populations[populations.apply(len) > 1]
-        if not inconsistent_pop.empty:
-            raise ValueError(f"Inconsistent population values in regions: {inconsistent_pop.index.tolist()}")
+        if 'population' in self.data.columns:
+            populations = self.data.groupby('areaName')['population'].unique()
+            inconsistent_pop = populations[populations.apply(len) > 1]
+            if not inconsistent_pop.empty:
+                logging.warning("Inconsistent population data found. Please verify the dataset.")
+                self.data = self.data.dropna(subset=['population'])
+        else:
+            logging.warning("'population' column not found in data.")
 
         # Optional scaling
         if scaler is not None:
             self.scaler = scaler
             # Flatten, scale, reshape
             self.feature_array = self.feature_array.reshape(-1, self.num_features)
-            self.feature_array = self.scaler.transform(self.feature_array)
+            self.feature_array = self.scaler.fit_transform(self.feature_array)
             self.feature_array = self.feature_array.reshape(self.num_dates, self.num_nodes, self.num_features)
         else:
             self.scaler = None
@@ -488,11 +528,17 @@ class EpiGNN(nn.Module):
                 stdv = 1.0 / math.sqrt(p.size(0))
                 p.data.uniform_(-stdv, stdv)
 
-    def forward(self, X, adj, adjacency_type='hybrid', states=None, dynamic_adj=None, index=None):
+    def forward(self, X, adj, adjacency_type='hybrid'):
         """
-        X:   (batch_size, T, m, F)
-        adj: (batch_size, m, m)
-        adjacency_type: 'static', 'dynamic', 'hybrid'
+        Forward pass for EpiGNN.
+
+        Args:
+            X (torch.Tensor): Input tensor of shape (batch_size, T, m, F).
+            adj (torch.Tensor): Adjacency matrix of shape (batch_size, m, m).
+            adjacency_type (str): Type of adjacency to use ('static', 'dynamic', 'hybrid').
+
+        Returns:
+            torch.Tensor: Output tensor of shape (batch_size, T_out, m).
         """
         # (1) Permute input to match RegionAwareConv
         X_reshaped = X.permute(0, 3, 1, 2)   # => (batch_size, F, T, m)
@@ -521,19 +567,16 @@ class EpiGNN(nn.Module):
 
         # (7) Handle adjacency types
         if adjacency_type == 'static':
-            # Use only static adjacency
-            combined_adj = adj
+            combined_adj = adj > 0
         elif adjacency_type == 'dynamic':
-            # Use only dynamic adjacency
-            combined_adj = learned_adj
+            combined_adj = learned_adj > 0
         elif adjacency_type == 'hybrid':
-            # Use hybrid adjacency
-            d_mat = torch.sum(adj, dim=1, keepdim=True) * torch.sum(adj, dim=2, keepdim=True)
-            d_mat = torch.sigmoid(self.d_gate * d_mat)
-            spatial_adj = d_mat * adj
-            combined_adj = torch.clamp(learned_adj + spatial_adj, 0, 1)
+            combined_adj = (learned_adj + adj > 0).float()
         else:
             raise ValueError("Invalid adjacency_type. Choose from 'static', 'dynamic', 'hybrid'.")
+
+        # Ensure combined_adj is binary
+        combined_adj = combined_adj.float()
 
         # (8) Laplacian-like adjacency for GNN
         laplace_adj = getLaplaceMat(X.size(0), self.m, combined_adj)
@@ -542,7 +585,7 @@ class EpiGNN(nn.Module):
         node_state = feat_emb
         gat_outputs = []
         for gat in self.GATLayers:
-            node_state = gat(node_state, laplace_adj)
+            node_state = gat(node_state, laplace_adj)  # (batch_size, m, num_heads * out_features)
             node_state = F.elu(node_state)
             node_state = self.dropout_layer(node_state)
             gat_outputs.append(node_state)  # Collect outputs for concatenation
@@ -553,7 +596,7 @@ class EpiGNN(nn.Module):
 
         # (11) Final projection => (batch_size, T_out, m)
         res = self.output(node_state_all)
-        return res.transpose(1, 2)
+        return res.transpose(1, 2)  # => (batch_size, T_out, m)
 
 # ==============================================================================
 # 6. Utility Functions
@@ -573,7 +616,9 @@ def haversine(lon1, lat1, lon2, lat2):
     r = 6371  # Radius of Earth in kilometers
     return c * r
 
-def compute_geographic_adjacency(regions, latitudes, longitudes, threshold=threshold_distance):
+from scipy.spatial.distance import pdist, squareform
+
+def compute_geographic_adjacency(regions, latitudes, longitudes, threshold=THRESHOLD_DISTANCE):
     """
     Compute a static adjacency matrix based on geographic distances.
     
@@ -586,16 +631,21 @@ def compute_geographic_adjacency(regions, latitudes, longitudes, threshold=thres
     Returns:
         torch.Tensor: Adjacency matrix of shape (m, m), where m is the number of regions.
     """
-    m = len(regions)
-    adj_matrix = np.zeros((m, m), dtype=np.float32)
-    for i in range(m):
-        for j in range(m):
-            if i == j:
-                adj_matrix[i][j] = 1.0  # Self-loop
-            else:
-                distance = haversine(longitudes[i], latitudes[i], longitudes[j], latitudes[j])
-                if distance <= threshold:
-                    adj_matrix[i][j] = 1.0
+    coords = np.radians(np.column_stack((latitudes, longitudes)))
+    # Compute pairwise haversine distances
+    def haversine_distance(u, v):
+        lat1, lon1 = u
+        lat2, lon2 = v
+        dlon = lon2 - lon1
+        dlat = lat2 - lat1
+        a = np.sin(dlat / 2)**2 + np.cos(lat1) * np.cos(lat2) * np.sin(dlon / 2)**2
+        c = 2 * np.arcsin(np.sqrt(a))
+        r = 6371  # Earth's radius in km
+        return c * r
+    
+    distances = squareform(pdist(coords, metric=haversine_distance))
+    adj_matrix = (distances <= threshold).astype(np.float32)
+    np.fill_diagonal(adj_matrix, 1.0)  # Ensure self-connections
     return torch.tensor(adj_matrix, dtype=torch.float32)
 
 def getLaplaceMat(batch_size: int,
@@ -603,14 +653,22 @@ def getLaplaceMat(batch_size: int,
                  adj: torch.Tensor) -> torch.Tensor:
     """
     Compute a Laplacian-like matrix for GCN from adjacency.
+
+    Args:
+        batch_size (int): Number of samples in the batch.
+        m (int): Number of nodes.
+        adj (torch.Tensor): Adjacency matrix of shape (batch_size, m, m).
+
+    Returns:
+        torch.Tensor: Normalized adjacency matrix of shape (batch_size, m, m).
     """
     i_mat = torch.eye(m).to(adj.device).unsqueeze(0).expand(batch_size, m, m)
     adj_bin = (adj > 0).float()
-    deg = torch.sum(adj_bin, dim=2)
-    deg_inv = 1.0 / (deg + 1e-12)
+    deg = torch.sum(adj_bin, dim=2)  # Degree matrix
+    deg_inv = 1.0 / (deg + 1e-12)    # Inverse degree matrix
     deg_inv_mat = i_mat * deg_inv.unsqueeze(2)
-    laplace_mat = torch.bmm(deg_inv_mat, adj_bin)
-    return laplace_mat
+    laplace_adj = torch.bmm(deg_inv_mat, adj_bin)  # Normalized adjacency
+    return laplace_adj
 
 # ==============================================================================
 # 7. Model Initialization
@@ -620,49 +678,80 @@ def initialize_model():
     Initialize the updated EpiGNN model with Multi-Head GAT Layers.
     """
     model = EpiGNN(
-        num_nodes=num_nodes,
-        num_features=num_features,
-        num_timesteps_input=num_timesteps_input,
-        num_timesteps_output=num_timesteps_output,
-        k=k,
-        hidA=hidA,
-        hidR=hidR,
-        hidP=hidP,
-        n_layer=n_layer,
-        num_heads=num_heads,
-        dropout=dropout,
+        num_nodes=NUM_NODES,
+        num_features=NUM_FEATURES,
+        num_timesteps_input=NUM_TIMESTEPS_INPUT,
+        num_timesteps_output=NUM_TIMESTEPS_OUTPUT,
+        k=K,
+        hidA=HID_A,
+        hidR=HID_R,
+        hidP=HID_P,
+        n_layer=N_LAYER,
+        num_heads=NUM_HEADS,
+        dropout=DROPOUT,
         device=device
     ).to(device)
-    optimizer = optim.AdamW(model.parameters(), lr=learning_rate, weight_decay=1e-4)
+    optimizer = optim.AdamW(model.parameters(), lr=LEARNING_RATE, weight_decay=1e-4)
     criterion = nn.MSELoss()
     scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer,
                                                      mode='min',
                                                      factor=0.5,
                                                      patience=3,
-                                                     verbose=False)  # Set verbose=False to suppress warnings
+                                                     verbose=True)
+    logging.info("Model, optimizer, loss function, and scheduler initialized successfully.")
     return model, optimizer, criterion, scheduler
 
 # ==============================================================================
 # 8. Training and Evaluation Function
 # ==============================================================================
-def run_experiment(adjacency_type='hybrid', experiment_id=1, summary_metrics=[]):
+def run_experiment(adjacency_type='hybrid', experiment_id=1, summary_metrics=None,
+                  train_loader=None, val_loader=None, test_loader=None,
+                  adj_static=None, scaled_dataset=None, regions=None,
+                  data=None, test_subset=None, train_size=None, val_size=None):
     """
     Run training and evaluation for a specific adjacency type.
-    
-    adjacency_type: 'static', 'dynamic', 'hybrid'
-    experiment_id: Identifier for the experiment (1, 2, 3)
-    summary_metrics: List to collect metrics for summary
+
+    Parameters:
+    -----------
+    adjacency_type : str
+        Type of adjacency to use ('static', 'dynamic', 'hybrid').
+    experiment_id : int
+        Identifier for the experiment.
+    summary_metrics : list
+        List to collect metrics for summary.
+    train_loader : DataLoader
+        DataLoader for training data.
+    val_loader : DataLoader
+        DataLoader for validation data.
+    test_loader : DataLoader
+        DataLoader for test data.
+    adj_static : torch.Tensor
+        Static adjacency matrix.
+    scaled_dataset : NHSRegionDataset
+        The scaled dataset containing the scaler.
+    regions : list
+        List of region names.
+    data : pd.DataFrame
+        The original preprocessed data.
+    test_subset : Subset
+        Subset of the dataset used for testing.
+    train_size : int
+        Number of training samples.
+    val_size : int
+        Number of validation samples.
     """
-    print(f"\n[Experiment {experiment_id}] Starting with {adjacency_type} adjacency...\n")
-    
-    # Initialize model, optimizer, criterion, scheduler
+    if summary_metrics is None:
+        summary_metrics = []
+
+    logging.info(f"Starting Experiment {experiment_id} with {adjacency_type} adjacency.")
+
     model, optimizer, criterion, scheduler = initialize_model()
-    
+
     best_val_loss = float('inf')
     patience_counter = 0
     train_losses, val_losses = [], []
-    
-    for epoch in range(num_epochs):
+
+    for epoch in range(1, NUM_EPOCHS + 1):
         model.train()
         epoch_train_loss = 0.0
 
@@ -676,13 +765,19 @@ def run_experiment(adjacency_type='hybrid', experiment_id=1, summary_metrics=[])
             if adjacency_type == 'static':
                 adj_input = adj_static.unsqueeze(0).repeat(batch_size_current, 1, 1)
             elif adjacency_type == 'dynamic':
-                adj_input = torch.zeros_like(adj_static).unsqueeze(0).repeat(batch_size_current, 1, 1)
+                # Use the learned adjacency from GraphLearner
+                adj_input = model.graphGen(model.backbone.forward(batch_X.permute(0, 3, 1, 2)))
             elif adjacency_type == 'hybrid':
-                adj_input = adj_static.unsqueeze(0).repeat(batch_size_current, 1, 1)
+                adj_input = adj_static.unsqueeze(0).repeat(batch_size_current, 1, 1) + model.graphGen(model.backbone.forward(batch_X.permute(0, 3, 1, 2)))
             else:
                 raise ValueError("Invalid adjacency_type. Choose from 'static', 'dynamic', 'hybrid'.")
 
-            pred = model(batch_X, adj_input, adjacency_type=adjacency_type)
+            # Ensure adjacency is binary for 'static' and 'hybrid', continuous for 'dynamic'
+            if adjacency_type in ['static', 'hybrid']:
+                adj_input = (adj_input > 0).float()
+
+            # Forward pass
+            pred = model(batch_X, adj_input, adjacency_type=adjacency_type)  # (batch_size, T_out, m)
             loss = criterion(pred, batch_Y)
             loss.backward()
 
@@ -710,11 +805,15 @@ def run_experiment(adjacency_type='hybrid', experiment_id=1, summary_metrics=[])
                 if adjacency_type == 'static':
                     adj_input = adj_static.unsqueeze(0).repeat(batch_size_current, 1, 1)
                 elif adjacency_type == 'dynamic':
-                    adj_input = torch.zeros_like(adj_static).unsqueeze(0).repeat(batch_size_current, 1, 1)
+                    adj_input = model.graphGen(model.backbone.forward(batch_X.permute(0, 3, 1, 2)))
                 elif adjacency_type == 'hybrid':
-                    adj_input = adj_static.unsqueeze(0).repeat(batch_size_current, 1, 1)
+                    adj_input = adj_static.unsqueeze(0).repeat(batch_size_current, 1, 1) + model.graphGen(model.backbone.forward(batch_X.permute(0, 3, 1, 2)))
                 else:
                     raise ValueError("Invalid adjacency_type. Choose from 'static', 'dynamic', 'hybrid'.")
+
+                # Ensure adjacency is binary for 'static' and 'hybrid', continuous for 'dynamic'
+                if adjacency_type in ['static', 'hybrid']:
+                    adj_input = (adj_input > 0).float()
 
                 pred = model(batch_X, adj_input, adjacency_type=adjacency_type)
                 vloss = criterion(pred, batch_Y)
@@ -729,28 +828,22 @@ def run_experiment(adjacency_type='hybrid', experiment_id=1, summary_metrics=[])
         # Scheduler step
         scheduler.step(avg_val_loss)
 
-        # R² computation per node
-        all_val_preds = np.concatenate(all_val_preds, axis=0)     
-        all_val_actuals = np.concatenate(all_val_actuals, axis=0) 
-        # Reshape to (num_samples, T_out, num_nodes)
-        all_val_preds_reshaped = all_val_preds.reshape(-1, num_timesteps_output, num_nodes)
-        all_val_actuals_reshaped = all_val_actuals.reshape(-1, num_timesteps_output, num_nodes)
-        # Compute mean over samples
-        preds_mean = np.mean(all_val_preds_reshaped, axis=0)  # (T_out, num_nodes)
-        actuals_mean = np.mean(all_val_actuals_reshaped, axis=0)  # (T_out, num_nodes)
-        # Compute R² per node
+        # Compute R² scores
+        all_val_preds = np.concatenate(all_val_preds, axis=0)  # (B_total, T_out, m)
+        all_val_actuals = np.concatenate(all_val_actuals, axis=0)  # (B_total, T_out, m)
+        preds_mean = np.mean(all_val_preds, axis=0)  # (T_out, m)
+        actuals_mean = np.mean(all_val_actuals, axis=0)  # (T_out, m)
         r2_vals = []
-        for node_idx in range(num_nodes):
+        for node_idx in range(NUM_NODES):
             if np.isnan(preds_mean[:, node_idx]).any() or np.isnan(actuals_mean[:, node_idx]).any():
                 r2 = float('nan')
             else:
                 r2 = r2_score(actuals_mean[:, node_idx], preds_mean[:, node_idx])
             r2_vals.append(r2)
 
-        print(f"[Epoch {epoch+1}/{num_epochs}] "
-              f"Train Loss: {avg_train_loss:.4f} | "
-              f"Val Loss: {avg_val_loss:.4f} | "
-              f"Val R² (per node): {r2_vals}")
+        logging.info(f"Epoch {epoch}/{NUM_EPOCHS} - "
+                     f"Train Loss: {avg_train_loss:.4f} | "
+                     f"Val Loss: {avg_val_loss:.4f} | R² per node: {r2_vals}")
 
         # Early stopping
         if avg_val_loss < best_val_loss:
@@ -759,12 +852,12 @@ def run_experiment(adjacency_type='hybrid', experiment_id=1, summary_metrics=[])
             os.makedirs(checkpoint_dir, exist_ok=True)
             checkpoint_path = f'{checkpoint_dir}/best_model.pth'
             torch.save(model.state_dict(), checkpoint_path)
-            print(f"[Info] Model checkpoint saved at {checkpoint_path}.")
+            logging.info(f"Saved best model checkpoint at {checkpoint_path}.")
             patience_counter = 0
         else:
             patience_counter += 1
-            if patience_counter >= early_stopping_patience:
-                print("[Info] Early stopping triggered.")
+            if patience_counter >= EARLY_STOPPING_PATIENCE:
+                logging.info("Early stopping triggered.")
                 break
 
     # Plot training vs. validation loss
@@ -773,26 +866,21 @@ def run_experiment(adjacency_type='hybrid', experiment_id=1, summary_metrics=[])
     sns.lineplot(x=range(1, len(val_losses) + 1), y=val_losses, label='Validation Loss', color='orange')
     plt.xlabel('Epoch')
     plt.ylabel('MSE Loss')
-    plt.title(f'Training and Validation Loss Curves - {adjacency_type.capitalize()} Adjacency')
+    plt.title(f'Training and Validation Loss Curves - Experiment {experiment_id} ({adjacency_type.capitalize()} Adjacency)')
     plt.legend()
     plt.grid(True)
     plt.tight_layout()
-    # Include experiment-specific folder with adjacency type
     loss_plot_dir = os.path.join('figures', f'experiment{experiment_id}_{adjacency_type}', 'training_validation_loss')
     os.makedirs(loss_plot_dir, exist_ok=True)
     plot_path = os.path.join(loss_plot_dir, f'training_validation_loss_experiment{experiment_id}_{adjacency_type}.png')
     plt.savefig(plot_path, dpi=300)
     plt.close()
-    print(f"[Info] Loss curves saved to {plot_path}")
+    logging.info(f"Loss curves saved to {plot_path}")
 
     # Load best model for testing
-    # If PyTorch >= 2.0, you can set weights_only=True to suppress the FutureWarning, e.g.:
-    torch_version = torch.__version__
-    major_version = int(torch_version.split('.')[0])
-    if major_version >= 2:
-        model.load_state_dict(torch.load(checkpoint_path, map_location=device, weights_only=True), strict=False)
-    else:
-        model.load_state_dict(torch.load(checkpoint_path, map_location=device), strict=False)
+    checkpoint_path = f'models/experiment{experiment_id}_{adjacency_type}/best_model.pth'
+    model.load_state_dict(torch.load(checkpoint_path, map_location=device))
+    model.eval()
 
     # Test Evaluation
     test_loss = 0.0
@@ -808,43 +896,44 @@ def run_experiment(adjacency_type='hybrid', experiment_id=1, summary_metrics=[])
             if adjacency_type == 'static':
                 adj_input = adj_static.unsqueeze(0).repeat(batch_size_current, 1, 1)
             elif adjacency_type == 'dynamic':
-                adj_input = torch.zeros_like(adj_static).unsqueeze(0).repeat(batch_size_current, 1, 1)
+                adj_input = model.graphGen(model.backbone.forward(batch_X.permute(0, 3, 1, 2)))
             elif adjacency_type == 'hybrid':
-                adj_input = adj_static.unsqueeze(0).repeat(batch_size_current, 1, 1)
+                adj_input = adj_static.unsqueeze(0).repeat(batch_size_current, 1, 1) + model.graphGen(model.backbone.forward(batch_X.permute(0, 3, 1, 2)))
             else:
                 raise ValueError("Invalid adjacency_type. Choose from 'static', 'dynamic', 'hybrid'.")
+
+            # Ensure adjacency is binary for 'static' and 'hybrid', continuous for 'dynamic'
+            if adjacency_type in ['static', 'hybrid']:
+                adj_input = (adj_input > 0).float()
 
             pred = model(batch_X, adj_input, adjacency_type=adjacency_type)
             loss = criterion(pred, batch_Y)
             test_loss += loss.item()
 
-            all_preds.append(pred.cpu())
-            all_actuals.append(batch_Y.cpu())
+            all_preds.append(pred.cpu().numpy())
+            all_actuals.append(batch_Y.cpu().numpy())
 
     avg_test_loss = test_loss / len(test_loader)
-    print(f"[Experiment {experiment_id}] Test Loss (MSE): {avg_test_loss:.4f}")
+    logging.info(f"Experiment {experiment_id} - Test Loss (MSE): {avg_test_loss:.4f}")
 
     # Combine predictions and actuals
-    all_preds = torch.cat(all_preds, dim=0)
-    all_actuals = torch.cat(all_actuals, dim=0)
+    all_preds_np = np.concatenate(all_preds, axis=0)      # (B_test, T_out, m)
+    all_actuals_np = np.concatenate(all_actuals, axis=0)  # (B_test, T_out, m)
 
     # Inverse transform only the 'covidOccupiedMVBeds' feature (index 4)
     if scaled_dataset.scaler is not None:
         scale_covid = scaled_dataset.scaler.scale_[4]
         mean_covid  = scaled_dataset.scaler.mean_[4]
 
-        all_preds_np   = all_preds.numpy()   * scale_covid + mean_covid
-        all_actuals_np = all_actuals.numpy() * scale_covid + mean_covid
-    else:
-        all_preds_np   = all_preds.numpy()
-        all_actuals_np = all_actuals.numpy()
+        all_preds_np   = all_preds_np * scale_covid + mean_covid
+        all_actuals_np = all_actuals_np * scale_covid + mean_covid
 
     # Flatten for final metrics
     # Reshape to (num_samples, T_out, num_nodes)
-    all_preds_reshaped = all_preds_np.reshape(-1, num_timesteps_output, num_nodes)
-    all_actuals_reshaped = all_actuals_np.reshape(-1, num_timesteps_output, num_nodes)
-    preds_flat   = all_preds_reshaped.reshape(-1, num_nodes)   # (num_samples * T_out, num_nodes)
-    actuals_flat = all_actuals_reshaped.reshape(-1, num_nodes)
+    all_preds_reshaped = all_preds_np.reshape(-1, NUM_NODES)   # (num_samples * T_out, num_nodes)
+    all_actuals_reshaped = all_actuals_np.reshape(-1, NUM_NODES)
+    preds_flat   = all_preds_reshaped.reshape(-1, NUM_NODES)   # (num_samples * T_out, num_nodes)
+    actuals_flat = all_actuals_reshaped.reshape(-1, NUM_NODES)
 
     # Metrics
     mae_per_node = mean_absolute_error(actuals_flat, preds_flat, multioutput='raw_values')
@@ -854,7 +943,7 @@ def run_experiment(adjacency_type='hybrid', experiment_id=1, summary_metrics=[])
     
     # Calculate Pearson Correlation Coefficient for each region
     pcc_per_node = []
-    for i in range(num_nodes):
+    for i in range(NUM_NODES):
         # Handle cases where variance is zero
         if np.std(actuals_flat[:, i]) == 0 or np.std(preds_flat[:, i]) == 0:
             pcc_per_node.append(0.0)
@@ -863,7 +952,7 @@ def run_experiment(adjacency_type='hybrid', experiment_id=1, summary_metrics=[])
             if np.isnan(pcc):
                 pcc = 0.0
             pcc_per_node.append(pcc)
-    
+
     # Save metrics to CSV
     metrics_dict = {
         'Experiment_ID': [],
@@ -899,10 +988,10 @@ def run_experiment(adjacency_type='hybrid', experiment_id=1, summary_metrics=[])
     os.makedirs(metrics_csv_dir, exist_ok=True)
     metrics_csv_path = os.path.join(metrics_csv_dir, f'metrics_experiment{experiment_id}_{adjacency_type}.csv')
     metrics_df.to_csv(metrics_csv_path, index=False)
-    print(f"[Info] Metrics saved to {metrics_csv_path}")
+    logging.info(f"Metrics saved to {metrics_csv_path}")
 
     # ==============================================================================
-    # 10. Visualization
+    # 9. Visualization
     # ==============================================================================
     def plot_actual_vs_predicted(preds, actuals, regions, experiment_id, adjacency_type, output_dir='figures'):
         """
@@ -911,10 +1000,11 @@ def run_experiment(adjacency_type='hybrid', experiment_id=1, summary_metrics=[])
         full_output_dir = os.path.join(output_dir, f'experiment{experiment_id}_{adjacency_type}', 'actual_vs_predicted')
         os.makedirs(full_output_dir, exist_ok=True)
         
-        time_steps = range(num_timesteps_output)
+        time_steps = range(NUM_TIMESTEPS_OUTPUT)
 
-        preds_mean = np.mean(preds.reshape(-1, num_timesteps_output, num_nodes), axis=0)
-        actuals_mean = np.mean(actuals.reshape(-1, num_timesteps_output, num_nodes), axis=0)
+        # Compute mean over samples for plotting
+        preds_mean = np.mean(preds.reshape(-1, NUM_TIMESTEPS_OUTPUT, NUM_NODES), axis=0)  # (T_out, m)
+        actuals_mean = np.mean(actuals.reshape(-1, NUM_TIMESTEPS_OUTPUT, NUM_NODES), axis=0)  # (T_out, m)
 
         for region_idx, region in enumerate(regions):
             plt.figure(figsize=(12, 6))
@@ -929,7 +1019,7 @@ def run_experiment(adjacency_type='hybrid', experiment_id=1, summary_metrics=[])
             plot_path = os.path.join(full_output_dir, f'actual_vs_predicted_experiment{experiment_id}_{adjacency_type}_{region}.png')
             plt.savefig(plot_path, dpi=300)
             plt.close()
-            print(f"[Info] Actual vs. Predicted plot saved to {plot_path}")
+            logging.info(f"Actual vs. Predicted plot saved to {plot_path}")
 
     def plot_error_distribution(preds, actuals, regions, experiment_id, adjacency_type, output_dir='figures'):
         """
@@ -951,7 +1041,7 @@ def run_experiment(adjacency_type='hybrid', experiment_id=1, summary_metrics=[])
             plot_path = os.path.join(full_output_dir, f'error_distribution_experiment{experiment_id}_{adjacency_type}_{region}.png')
             plt.savefig(plot_path, dpi=300)
             plt.close()
-            print(f"[Info] Error distribution plot saved to {plot_path}")
+            logging.info(f"Error distribution plot saved to {plot_path}")
 
     def plot_cumulative_error(preds, actuals, regions, experiment_id, adjacency_type, output_dir='figures'):
         """
@@ -975,7 +1065,7 @@ def run_experiment(adjacency_type='hybrid', experiment_id=1, summary_metrics=[])
             plot_path = os.path.join(full_output_dir, f'cumulative_error_experiment{experiment_id}_{adjacency_type}_{region}.png')
             plt.savefig(plot_path, dpi=300)
             plt.close()
-            print(f"[Info] Cumulative error plot saved to {plot_path}")
+            logging.info(f"Cumulative error plot saved to {plot_path}")
 
     def plot_error_heatmap(preds, actuals, regions, experiment_id, adjacency_type, output_dir='figures'):
         """
@@ -984,19 +1074,23 @@ def run_experiment(adjacency_type='hybrid', experiment_id=1, summary_metrics=[])
         full_output_dir = os.path.join(output_dir, f'experiment{experiment_id}_{adjacency_type}', 'error_heatmaps')
         os.makedirs(full_output_dir, exist_ok=True)
         
-        errors = preds - actuals
+        # Reshape the predictions and actuals to 2D
+        preds_2d = preds.reshape(-1, len(regions))    # (num_samples * num_timesteps, num_regions)
+        actuals_2d = actuals.reshape(-1, len(regions)) # (num_samples * num_timesteps, num_regions)
+        errors = preds_2d - actuals_2d                 # (num_samples * num_timesteps, num_regions)
 
-        for region_idx, region in enumerate(regions):
-            plt.figure(figsize=(10, 2))
-            sns.heatmap(errors[:, region_idx].reshape(1, -1), annot=True, fmt=".2f", cmap='coolwarm', cbar=True)
-            plt.title(f'Prediction Errors Heatmap - {region}')
-            plt.xlabel('Time Steps')
-            plt.ylabel('')
-            plt.tight_layout()
-            plot_path = os.path.join(full_output_dir, f'error_heatmap_experiment{experiment_id}_{adjacency_type}_{region}.png')
-            plt.savefig(plot_path, dpi=300)
-            plt.close()
-            print(f"[Info] Error heatmap saved to {plot_path}")
+        # Create heatmap for all regions
+        plt.figure(figsize=(15, 8))
+        sns.heatmap(errors, annot=False, fmt=".2f", cmap='coolwarm', 
+                    xticklabels=regions, yticklabels=False)
+        plt.title(f'Prediction Errors Heatmap - All Regions')
+        plt.xlabel('Regions')
+        plt.ylabel('Time Steps')
+        plt.tight_layout()
+        plot_path = os.path.join(full_output_dir, f'error_heatmap_experiment{experiment_id}_{adjacency_type}_all_regions.png')
+        plt.savefig(plot_path, dpi=300)
+        plt.close()
+        logging.info(f"Error heatmap saved to {plot_path}")
 
     def plot_error_boxplot(preds, actuals, regions, experiment_id, adjacency_type, output_dir='figures'):
         """
@@ -1011,12 +1105,12 @@ def run_experiment(adjacency_type='hybrid', experiment_id=1, summary_metrics=[])
         sns.boxplot(data=errors, orient='h', palette='Set2')
         plt.title(f'Prediction Errors Boxplot - {adjacency_type.capitalize()} Adjacency')
         plt.xlabel('Prediction Error')
-        plt.yticks(ticks=range(num_nodes), labels=regions)
+        plt.yticks(ticks=range(NUM_NODES), labels=regions)
         plt.tight_layout()
         plot_path = os.path.join(full_output_dir, f'error_boxplot_experiment{experiment_id}_{adjacency_type}.png')
         plt.savefig(plot_path, dpi=300)
         plt.close()
-        print(f"[Info] Error boxplot saved to {plot_path}")
+        logging.info(f"Error boxplot saved to {plot_path}")
 
     def plot_scatter_actual_vs_predicted(preds, actuals, regions, experiment_id, adjacency_type, output_dir='figures'):
         """
@@ -1040,7 +1134,7 @@ def run_experiment(adjacency_type='hybrid', experiment_id=1, summary_metrics=[])
             plot_path = os.path.join(full_output_dir, f'scatter_actual_vs_predicted_experiment{experiment_id}_{adjacency_type}_{region}.png')
             plt.savefig(plot_path, dpi=300)
             plt.close()
-            print(f"[Info] Scatter plot saved to {plot_path}")
+            logging.info(f"Scatter plot saved to {plot_path}")
 
     def plot_error_metrics_heatmap(summary_df, experiment_id, adjacency_type, output_dir='figures'):
         """
@@ -1064,42 +1158,47 @@ def run_experiment(adjacency_type='hybrid', experiment_id=1, summary_metrics=[])
         plot_path = os.path.join(full_output_dir, f'metrics_heatmap_experiment{experiment_id}_{adjacency_type}.png')
         plt.savefig(plot_path, dpi=300)
         plt.close()
-        print(f"[Info] Metrics heatmap saved to {plot_path}")
+        logging.info(f"Metrics heatmap saved to {plot_path}")
 
     # Generate All Visualizations
-    print("[Info] Generating additional visualizations...")
+    logging.info("Generating additional visualizations...")
 
-    plot_actual_vs_predicted(preds_flat, actuals_flat, regions, experiment_id, adjacency_type)
-    plot_error_distribution(preds_flat, actuals_flat, regions, experiment_id, adjacency_type)
-    plot_cumulative_error(preds_flat, actuals_flat, regions, experiment_id, adjacency_type)
-    plot_error_heatmap(preds_flat, actuals_flat, regions, experiment_id, adjacency_type)
-    plot_error_boxplot(preds_flat, actuals_flat, regions, experiment_id, adjacency_type)
-    plot_scatter_actual_vs_predicted(preds_flat, actuals_flat, regions, experiment_id, adjacency_type)
+    plot_actual_vs_predicted(all_preds_np, all_actuals_np, regions, experiment_id, adjacency_type)
+    plot_error_distribution(all_preds_np, all_actuals_np, regions, experiment_id, adjacency_type)
+    plot_cumulative_error(all_preds_np, all_actuals_np, regions, experiment_id, adjacency_type)
+    plot_error_heatmap(all_preds_np, all_actuals_np, regions, experiment_id, adjacency_type)
+    plot_error_boxplot(all_preds_np, all_actuals_np, regions, experiment_id, adjacency_type)
+    plot_scatter_actual_vs_predicted(all_preds_np, all_actuals_np, regions, experiment_id, adjacency_type)
     plot_error_metrics_heatmap(pd.DataFrame(summary_metrics), experiment_id, adjacency_type)
-    print("[Info] All additional visualizations generated and saved.")
+    logging.info("All additional visualizations generated and saved.")
 
     # ==============================================================================
-    # 11. Save Final Model
+    # 10. Save Final Model
     # ==============================================================================
     final_model_path = f'models/experiment{experiment_id}_{adjacency_type}/epignn_final_model.pth'
     os.makedirs(os.path.dirname(final_model_path), exist_ok=True)
     torch.save(model.state_dict(), final_model_path)
-    print(f"[Info] Final model saved as '{final_model_path}'.")
+    logging.info(f"Final model saved as '{final_model_path}'.")
 
-    print(f"[Experiment {experiment_id}] Workflow complete.\n")
+    logging.info(f"Experiment {experiment_id} workflow complete.\n")
 
 # ==============================================================================
 # 9. Main Execution: Run All Experiments
 # ==============================================================================
-if __name__ == "__main__":
-    # Create necessary directories
+def main():
+    """
+    Main function to execute experiments.
+    """
+    # Setup directories
     os.makedirs('figures', exist_ok=True)
     os.makedirs('models', exist_ok=True)
     os.makedirs('results/metrics', exist_ok=True)
+    logging.info("Directories set up successfully.")
 
     # Load data
     csv_path = "data/merged_nhs_covid_data.csv"
     if not os.path.exists(csv_path):
+        logging.error(f"The specified CSV file does not exist: {csv_path}")
         raise FileNotFoundError(f"The specified CSV file does not exist: {csv_path}")
 
     data = pd.read_csv(csv_path, parse_dates=['date'])
@@ -1107,10 +1206,10 @@ if __name__ == "__main__":
 
     # Create initial dataset (no scaling)
     initial_dataset = NHSRegionDataset(data,
-                                       num_timesteps_input=num_timesteps_input,
-                                       num_timesteps_output=num_timesteps_output,
+                                       num_timesteps_input=NUM_TIMESTEPS_INPUT,
+                                       num_timesteps_output=NUM_TIMESTEPS_OUTPUT,
                                        scaler=None)
-    print(f"[Info] Total samples in initial dataset: {len(initial_dataset)}")
+    logging.info(f"Total samples in initial dataset: {len(initial_dataset)}")
 
     # Chronological train/val/test split
     total_len = len(initial_dataset)
@@ -1129,29 +1228,30 @@ if __name__ == "__main__":
         X, _ = initial_dataset[i]
         train_features.append(X.numpy())
 
-    train_features = np.concatenate(train_features, axis=0).reshape(-1, num_features)
+    train_features = np.concatenate(train_features, axis=0).reshape(-1, NUM_FEATURES)
     scaler.fit(train_features)
+    logging.info("Scaler fitted on training data.")
 
     # Create scaled dataset
     scaled_dataset = NHSRegionDataset(data,
-                                      num_timesteps_input=num_timesteps_input,
-                                      num_timesteps_output=num_timesteps_output,
+                                      num_timesteps_input=NUM_TIMESTEPS_INPUT,
+                                      num_timesteps_output=NUM_TIMESTEPS_OUTPUT,
                                       scaler=scaler)
-    print(f"[Info] Total samples in scaled dataset: {len(scaled_dataset)}")
+    logging.info(f"Total samples in scaled dataset: {len(scaled_dataset)}")
 
     # Subsets
     train_subset = Subset(scaled_dataset, train_indices)
     val_subset   = Subset(scaled_dataset, val_indices)
     test_subset  = Subset(scaled_dataset, test_indices)
 
-    print(f"[Info] Training samples:   {len(train_subset)}")
-    print(f"[Info] Validation samples: {len(val_subset)}")
-    print(f"[Info] Test samples:       {len(test_subset)}")
+    logging.info(f"Training samples:   {len(train_subset)}")
+    logging.info(f"Validation samples: {len(val_subset)}")
+    logging.info(f"Test samples:       {len(test_subset)}")
 
     # Dataloaders
-    train_loader = DataLoader(train_subset, batch_size=batch_size, shuffle=True, drop_last=True)
-    val_loader   = DataLoader(val_subset,   batch_size=batch_size, shuffle=False, drop_last=False)
-    test_loader  = DataLoader(test_subset,  batch_size=batch_size, shuffle=False, drop_last=False)
+    train_loader = DataLoader(train_subset, batch_size=BATCH_SIZE, shuffle=True, drop_last=True)
+    val_loader   = DataLoader(val_subset,   batch_size=BATCH_SIZE, shuffle=False, drop_last=False)
+    test_loader  = DataLoader(test_subset,  batch_size=BATCH_SIZE, shuffle=False, drop_last=False)
 
     # ==============================================================================
     # 10. Geographic Adjacency Computation
@@ -1160,11 +1260,11 @@ if __name__ == "__main__":
     latitudes  = [data[data['areaName'] == region]['latitude'].iloc[0]  for region in regions]
     longitudes = [data[data['areaName'] == region]['longitude'].iloc[0] for region in regions]
 
-    adj_static = compute_geographic_adjacency(regions, latitudes, longitudes).to(device)
-    print("[Info] Static Adjacency matrix:")
-    print(adj_static.cpu().numpy())
+    adj_static = compute_geographic_adjacency(regions, latitudes, longitudes, THRESHOLD_DISTANCE).to(device)
+    logging.info("Static Adjacency Matrix:")
+    logging.info(adj_static.cpu().numpy())
 
-    # Optional: Visualize adjacency as a geographic graph
+    # Visualize adjacency as a geographic graph
     adj_np = adj_static.cpu().numpy()
     G = nx.from_numpy_array(adj_np)
     mapping = {i: region for i, region in enumerate(regions)}
@@ -1182,8 +1282,8 @@ if __name__ == "__main__":
     plt.tight_layout()
     plot_path = 'figures/geographic_adjacency_graph_static.png'
     plt.savefig(plot_path, dpi=300)
-    plt.show()
-    print(f"[Info] Geographic adjacency graph saved to {plot_path}")
+    plt.close()
+    logging.info(f"Geographic adjacency graph saved to {plot_path}")
 
     # ==============================================================================
     # 11. Run All Experiments
@@ -1197,7 +1297,21 @@ if __name__ == "__main__":
     summary_metrics = []
 
     for exp in experiments:
-        run_experiment(adjacency_type=exp['adjacency_type'], experiment_id=exp['experiment_id'], summary_metrics=summary_metrics)
+        run_experiment(
+            adjacency_type=exp['adjacency_type'],
+            experiment_id=exp['experiment_id'],
+            summary_metrics=summary_metrics,
+            train_loader=train_loader,
+            val_loader=val_loader,
+            test_loader=test_loader,
+            adj_static=adj_static,
+            scaled_dataset=scaled_dataset,
+            regions=regions,
+            data=data,
+            test_subset=test_subset,
+            train_size=train_size,
+            val_size=val_size
+        )
 
     # ==============================================================================
     # 12. Summary of All Experiments
@@ -1206,16 +1320,72 @@ if __name__ == "__main__":
     summary_csv_path = 'results/metrics/summary_metrics.csv'
     os.makedirs(os.path.dirname(summary_csv_path), exist_ok=True)
     summary_df.to_csv(summary_csv_path, index=False)
-    print(f"[Info] Summary metrics saved to {summary_csv_path}")
+    logging.info(f"Summary metrics saved to {summary_csv_path}")
 
     # Pivot the summary dataframe for better readability
     summary_pivot = summary_df.pivot_table(index=['Experiment_ID', 'Adjacency_Type'],
                                           columns='Region',
                                           values=['MAE', 'RMSE', 'R2_Score', 'Pearson_Correlation']).reset_index()
 
-    print("\nSummary of All Experiments:")
-    print(summary_pivot)
+    logging.info("Summary of All Experiments:")
+    logging.info(summary_pivot)
 
     summary_pivot_csv_path = 'results/metrics/summary_metrics_pivot.csv'
     summary_pivot.to_csv(summary_pivot_csv_path, index=False)
-    print(f"[Info] Summary pivot table saved to {summary_pivot_csv_path}")
+    logging.info(f"Summary pivot table saved to {summary_pivot_csv_path}")
+
+    # Optional: Create a summary plot comparing different adjacency types
+    def plot_summary_metrics_comparison(summary_pivot: pd.DataFrame):
+        """
+        Plots average metrics across different adjacency types.
+
+        Parameters:
+        -----------
+        summary_pivot : pd.DataFrame
+            Pivoted summary metrics DataFrame.
+        """
+        metrics_list = ['MAE', 'RMSE', 'R2_Score', 'Pearson_Correlation']
+        plt.figure(figsize=(20, 12))
+        
+        # Determine grid size based on number of metrics
+        num_metrics = len(metrics_list)
+        cols = 2
+        rows = math.ceil(num_metrics / cols)
+        
+        for i, metric in enumerate(metrics_list):
+            plt.subplot(rows, cols, i+1)
+            
+            # Compute mean metric across regions
+            metric_mean = summary_pivot.groupby('Adjacency_Type')[metric].mean().reset_index()
+            
+            sns.barplot(x='Adjacency_Type', y=metric, data=metric_mean, palette='Set2')
+            
+            plt.title(f'Average {metric} across Adjacency Types')
+            plt.xlabel('Adjacency Type')
+            plt.ylabel(metric)
+            
+            # Dynamic y-axis limits
+            min_val = summary_pivot[metric].min()
+            max_val = summary_pivot[metric].max()
+            if metric in ['R2_Score', 'Pearson_Correlation']:
+                plt.ylim(min(-1, min_val * 1.2), max(1, max_val * 1.2))
+            else:
+                plt.ylim(0, max(max_val, 1) * 1.2)
+            
+            # Text annotations with safe y positions
+            for idx, row in metric_mean.iterrows():
+                x_pos = idx
+                y_pos = row[metric] + 0.05 * max_val
+                plt.text(x_pos, y_pos, f"{row[metric]:.4f}",
+                        ha='center', va='bottom', fontsize=10)
+            
+        plt.tight_layout()
+        summary_plot = 'figures/summary_metrics_comparison.png'
+        plt.savefig(summary_plot, dpi=300)
+        plt.close()
+        logging.info(f"Summary metrics comparison plot saved to {summary_plot}")
+
+    plot_summary_metrics_comparison(summary_pivot)
+
+if __name__ == "__main__":
+    main()
