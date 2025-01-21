@@ -616,6 +616,7 @@ def run_experiment(model_type='tgt', experiment_id=1, summary_metrics=[]):
     # Compute metrics
     mae_per_node = mean_absolute_error(actuals_flat, preds_flat, multioutput='raw_values')
     mse_per_node = mean_squared_error(actuals_flat, preds_flat, multioutput='raw_values')
+    rmse_per_node = mean_squared_error(actuals_flat, preds_flat, multioutput='raw_values', squared=False)
     r2_per_node  = r2_score(actuals_flat, preds_flat, multioutput='raw_values')
 
     pearson_per_node = []
@@ -634,6 +635,7 @@ def run_experiment(model_type='tgt', experiment_id=1, summary_metrics=[]):
         'Region': [],
         'MAE': [],
         'MSE': [],
+        'RMSE': [],
         'R2_Score': [],
         'Pearson_CC': []
     }
@@ -644,6 +646,7 @@ def run_experiment(model_type='tgt', experiment_id=1, summary_metrics=[]):
         metrics_dict['Region'].append(region)
         metrics_dict['MAE'].append(mae_per_node[idx])
         metrics_dict['MSE'].append(mse_per_node[idx])
+        metrics_dict['RMSE'].append(rmse_per_node[idx])
         metrics_dict['R2_Score'].append(r2_per_node[idx])
         metrics_dict['Pearson_CC'].append(pearson_per_node[idx])
 
@@ -653,6 +656,7 @@ def run_experiment(model_type='tgt', experiment_id=1, summary_metrics=[]):
             'Region': region,
             'MAE': mae_per_node[idx],
             'MSE': mse_per_node[idx],
+            'RMSE': rmse_per_node[idx],
             'R2_Score': r2_per_node[idx],
             'Pearson_CC': pearson_per_node[idx]
         })
@@ -723,7 +727,7 @@ def run_experiment(model_type='tgt', experiment_id=1, summary_metrics=[]):
         df = pd.DataFrame(summary_metrics)
         df = df[(df['Experiment_ID'] == experiment_id) & 
                 (df['Model_Type'] == model_type.upper())]
-        aggregated_metrics = df[['MAE','MSE','R2_Score','Pearson_CC']].mean()
+        aggregated_metrics = df[['MAE','MSE','RMSE','R2_Score','Pearson_CC']].mean()
 
         plt.figure(figsize=(8, 6))
         sns.barplot(x=aggregated_metrics.index, y=aggregated_metrics.values, palette='Set2')
@@ -825,6 +829,7 @@ if __name__ == "__main__":
     summary_pivot = summary_df.groupby(['Experiment_ID', 'Model_Type']).agg({
         'MAE': 'mean',
         'MSE': 'mean',
+        'RMSE': 'mean',
         'R2_Score': 'mean',
         'Pearson_CC': 'mean'
     }).reset_index()
@@ -837,7 +842,7 @@ if __name__ == "__main__":
 
     # Optional comparison plot for summary metrics
     def plot_summary_metrics(summary_pivot):
-        metrics_list = ['MAE', 'MSE', 'R2_Score', 'Pearson_CC']
+        metrics_list = ['MAE', 'MSE', 'RMSE', 'R2_Score', 'Pearson_CC']
         num_metrics = len(metrics_list)
         plt.figure(figsize=(15, 10))
         for i, metric in enumerate(metrics_list):
@@ -857,3 +862,4 @@ if __name__ == "__main__":
         print(f"[Info] Summary metrics comparison plot saved to {summary_plot}")
 
     plot_summary_metrics(summary_pivot)
+
