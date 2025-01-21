@@ -3,15 +3,37 @@ import os
 import sys
 from datetime import datetime
 from multiprocessing import Pool
+from urllib.parse import urljoin
+import io  # Required for StringIO
 
 import numpy as np
 import pandas as pd
 import requests
-from io import StringIO
 
 # Add the utils directory to sys.path
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'utils'))
-from utils import get_data_location, download_data  # Ensure these functions are correctly implemented
+from utils import get_data_location  # Ensure this function is correctly implemented
+
+def download_data(url):
+    """
+    Downloads CSV data from a given URL and returns a pandas DataFrame.
+    
+    :param url: URL of the CSV file.
+    :return: pandas DataFrame or None if download fails.
+    """
+    try:
+        response = requests.get(url, timeout=10)  # Added timeout
+        if response.status_code == 200:
+            # Use io.StringIO instead of pd.compat.StringIO
+            data = pd.read_csv(io.StringIO(response.text))
+            logging.info(f"Data downloaded successfully from {url}")
+            return data
+        else:
+            logging.warning(f"URL for {url} returned status code {response.status_code}")
+            return None
+    except Exception as e:
+        logging.error(f"Exception occurred while downloading data from {url}: {e}")
+        return None
 
 class GenerateTrainingData:
     """
@@ -24,11 +46,11 @@ class GenerateTrainingData:
         # Base URLs for raw data
         self.url_base_us = (
             "https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/"
-            "csse_covid_19_data/csse_covid_19_daily_reports_us"
+            "csse_covid_19_data/csse_covid_19_daily_reports_us/"
         )
         self.url_base = (
             "https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/"
-            "csse_covid_19_data/csse_covid_19_daily_reports"
+            "csse_covid_19_data/csse_covid_19_daily_reports/"
         )
         # Common columns expected in the dataset, including the new columns
         self.common_columns = [
@@ -57,19 +79,25 @@ class GenerateTrainingData:
         :return: Processed DataFrame or None if download fails.
         """
         date_formats = ["%m-%d-%Y", "%m-%d-%y"]
-        try:
-            # Generate formatted dates
-            formatted_dates = [datetime.strptime(date, "%Y-%m-%d").strftime(fmt) for fmt in date_formats]
-        except ValueError as ve:
-            logging.error(f"Date formatting error for {date}: {ve}")
+        formatted_dates = []
+        for fmt in date_formats:
+            try:
+                formatted_date = datetime.strptime(date, "%Y-%m-%d").strftime(fmt)
+                formatted_dates.append(formatted_date)
+            except ValueError:
+                logging.error(f"Date formatting error for {date} with format {fmt}")
+                continue
+
+        if not formatted_dates:
+            logging.error(f"No valid date formats for date: {date}")
             return None
 
         logging.info(f"Processing date: {date} with formatted dates: {formatted_dates}")
 
         # Attempt to download from both 'daily_reports_us' and 'daily_reports'
         for base_url in [self.url_base_us, self.url_base]:
-            for fmt, formatted_date in zip(date_formats, formatted_dates):
-                url = f"{base_url}/{formatted_date}.csv"
+            for formatted_date in formatted_dates:
+                url = urljoin(base_url, f"{formatted_date}.csv")
                 logging.info(f"Attempting to download data from URL: {url}")
                 data = download_data(url=url)
 
@@ -80,9 +108,6 @@ class GenerateTrainingData:
                         raw_file_path = get_data_location(f"{formatted_date}_raw.csv", folder=folder)
                         data.to_csv(raw_file_path, index=False)
                         logging.info(f"Raw data saved to {raw_file_path}")
-
-                        # Add 'date_today' column based on the date format
-                        data["date_today"] = datetime.strptime(formatted_date, fmt)
 
                         # Rename columns with conditional handling
                         rename_dict = {
@@ -108,6 +133,7 @@ class GenerateTrainingData:
                             data["hospitalization"] = np.nan
                             logging.warning(f"'People_Hospitalized' missing in {formatted_date}.csv")
 
+                        # Rename columns and drop rows where 'fips' is missing
                         data = data.rename(columns=rename_dict).dropna(subset=["fips"])
 
                         # Convert 'fips' to integer
@@ -122,6 +148,9 @@ class GenerateTrainingData:
 
                         # Select only the common columns
                         data = data[self.common_columns]
+
+                        # Add 'date_today' column using the original date
+                        data["date_today"] = pd.to_datetime(date)
 
                         return data
 
@@ -138,7 +167,7 @@ class GenerateTrainingData:
     def download_jhu_data(self, start_time, end_time):
         """
         Downloads and processes COVID-19 data for a given date range.
-        Saves raw and processed data.
+        Saves processed data.
         Returns a combined DataFrame of all the processed data.
 
         :param start_time: Start date in 'YYYY-MM-DD' format.
@@ -147,7 +176,7 @@ class GenerateTrainingData:
         """
         try:
             # Generate list of dates in 'YYYY-MM-DD' format
-            date_list = pd.date_range(start_time, end_time).strftime("%Y-%m-%d")
+            date_list = pd.date_range(start_time, end_time).strftime("%Y-%m-%d").tolist()
             logging.info(f"Generated date list from {start_time} to {end_time}")
 
             # Use multiprocessing to download data files in parallel
@@ -175,10 +204,12 @@ class GenerateTrainingData:
 
             # Sort data by fips and date to ensure correct diff operations
             data = data.sort_values(by=["fips", "date_today"])
+            logging.info("Data sorted by 'fips' and 'date_today'.")
 
             # Calculate daily new cases
             data["new_cases"] = data.groupby("fips")["confirmed"].diff().fillna(0)
             data["new_cases"] = data["new_cases"].apply(lambda x: x if x >= 0 else 0)
+            logging.info("Calculated 'new_cases'.")
 
             # Calculate daily hospitalizations
             # Handle missing hospitalization data by forward filling within each fips group
@@ -187,6 +218,7 @@ class GenerateTrainingData:
             data["hospitalization"] = data["hospitalization"].apply(
                 lambda x: x if x >= 0 else 0
             )
+            logging.info("Calculated 'hospitalization'.")
 
             # Ensure all common columns are present
             for col in self.common_columns:
@@ -196,15 +228,17 @@ class GenerateTrainingData:
 
             # Select only the common columns
             data = data[self.common_columns]
+            logging.info("Selected common columns.")
 
             # Fill remaining NaNs if any
             data = data.fillna(0)
+            logging.info("Filled remaining NaNs with 0.")
 
-            # Save the processed data to a pickle file in the 'processed' directory
+            # Save the processed data to a CSV file in the 'processed' directory
             processed_file_path = get_data_location(
-                "processed_covid_data.pickle", folder="processed"
+                "processed_covid_data.csv", folder="processed"
             )
-            data.to_pickle(processed_file_path)
+            data.to_csv(processed_file_path, index=False)
             logging.info(f"Processed data saved to {processed_file_path}")
 
             self.df = data
