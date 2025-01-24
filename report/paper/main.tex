@@ -24,39 +24,48 @@
 %\date{}
 
 \newif\ifuniqueAffiliation
-% Comment to use multiple affiliations variant of author block 
+% Comment to use the multiple affiliations variant of the author block
 \uniqueAffiliationtrue
 
 \ifuniqueAffiliation % Standard variant of author block
-\author{ \href{https://orcid.org/0000-0000-0000-0000}{\includegraphics[scale=0.06]{orcid.pdf}\hspace{1mm}David S.~Hippocampus}\thanks{Use footnote for providing further
-		information about author (webpage, alternative
-		address)---\emph{not} for acknowledging funding agencies.} \\
-	Department of Computer Science\\
-	Cranberry-Lemon University\\
-	Pittsburgh, PA 15213 \\
-	\texttt{hippo@cs.cranberry-lemon.edu} \\
-	%% examples of more authors
-	\And
-	\href{https://orcid.org/0000-0000-0000-0000}{\includegraphics[scale=0.06]{orcid.pdf}\hspace{1mm}Elias D.~Striatum} \\
-	Department of Electrical Engineering\\
-	Mount-Sheikh University\\
-	Santa Narimana, Levand \\
-	\texttt{stariate@ee.mount-sheikh.edu} \\
-	%% \AND
-	%% Coauthor \\
-	%% Affiliation \\
-	%% Address \\
-	%% \texttt{email} \\
-	%% \And
-	%% Coauthor \\
-	%% Affiliation \\
-	%% Address \\
-	%% \texttt{email} \\
-	%% \And
-	%% Coauthor \\
-	%% Affiliation \\
-	%% Address \\
-	%% \texttt{email} \\
+\author{
+    \href{https://orcid.org/0000-0000-0000-0000}{\includegraphics[scale=0.06]{orcid.pdf}\hspace{1mm}Michael Ajao-Olarinoye}\thanks{Centre for Computational Science and Mathematical Modelling, Coventry University, Coventry, United Kingdom. Contact: \texttt{michael.ajao@coventry.ac.uk}} \\
+    Centre for Computational Science and Mathematical Modelling \\
+    Coventry University \\
+    Coventry, United Kingdom \\
+    \texttt{michael.ajao@coventry.ac.uk} \\
+    \And
+    \href{https://orcid.org/0000-0000-0000-0000}{\includegraphics[scale=0.06]{orcid.pdf}\hspace{1mm}Vasile Palade} \\
+    Centre for Computational Science and Mathematical Modelling \\
+    Coventry University \\
+    Coventry, United Kingdom \\
+    \texttt{vasile.palade@coventry.ac.uk} \\
+    \And
+    \href{https://orcid.org/0000-0000-0000-0000}{\includegraphics[scale=0.06]{orcid.pdf}\hspace{1mm}Fei He} \\
+    Centre for Computational Science and Mathematical Modelling \\
+    Coventry University \\
+    Coventry, United Kingdom \\
+    \texttt{fei.he@coventry.ac.uk} \\
+    \And
+    \href{https://orcid.org/0000-0000-0000-0000}{\includegraphics[scale=0.06]{orcid.pdf}\hspace{1mm}Petra A.~Wark} \\
+    Centre for Healthcare and Communities \\
+    Coventry University \\
+    Coventry, United Kingdom \\
+    Institute of Applied Research and Technology, \\
+    Dubai International Academic City, Dubai, UAE \\
+    \texttt{petra.wark@coventry.ac.uk} \\
+    \And
+    \href{https://orcid.org/0000-0000-0000-0000}{\includegraphics[scale=0.06]{orcid.pdf}\hspace{1mm}Zindoga Mukandavire} \\
+    Centre for Computational Science and Mathematical Modelling \\
+    Coventry University \\
+    Coventry, United Kingdom \\
+    \texttt{zindoga.mukandavire@coventry.ac.uk} \\
+    \And
+    \href{https://orcid.org/0000-0000-0000-0000}{\includegraphics[scale=0.06]{orcid.pdf}\hspace{1mm}Seyed Mousavi} \\
+    Centre for Computational Science and Mathematical Modelling \\
+    Coventry University \\
+    Coventry, United Kingdom \\
+    \texttt{seyed.mousavi@coventry.ac.uk} \\
 }
 \else
 % Multiple affiliations variant of author block
@@ -66,13 +75,26 @@
 % box is needed for correct spacing with authblk
 \newbox{\orcid}\sbox{\orcid}{\includegraphics[scale=0.06]{orcid.pdf}} 
 \author[1]{%
-	\href{https://orcid.org/0000-0000-0000-0000}{\usebox{\orcid}\hspace{1mm}David S.~Hippocampus\thanks{\texttt{hippo@cs.cranberry-lemon.edu}}}%
+    \href{https://orcid.org/0000-0000-0000-0000}{\usebox{\orcid}\hspace{1mm}Michael Ajao-Olarinoye\thanks{\texttt{michael.ajao@coventry.ac.uk}}}%
 }
-\author[1,2]{%
-	\href{https://orcid.org/0000-0000-0000-0000}{\usebox{\orcid}\hspace{1mm}Elias D.~Striatum\thanks{\texttt{stariate@ee.mount-sheikh.edu}}}%
+\author[1]{%
+    \href{https://orcid.org/0000-0000-0000-0000}{\usebox{\orcid}\hspace{1mm}Vasile Palade\thanks{\texttt{vasile.palade@coventry.ac.uk}}}%
 }
-\affil[1]{Department of Computer Science, Cranberry-Lemon University, Pittsburgh, PA 15213}
-\affil[2]{Department of Electrical Engineering, Mount-Sheikh University, Santa Narimana, Levand}
+\author[1]{%
+    \href{https://orcid.org/0000-0000-0000-0000}{\usebox{\orcid}\hspace{1mm}Fei He\thanks{\texttt{fei.he@coventry.ac.uk}}}%
+}
+\author[2]{%
+    \href{https://orcid.org/0000-0000-0000-0000}{\usebox{\orcid}\hspace{1mm}Petra A.~Wark\thanks{\texttt{petra.wark@coventry.ac.uk}}}%
+}
+\author[3]{%
+    \href{https://orcid.org/0000-0000-0000-0000}{\usebox{\orcid}\hspace{1mm}Zindoga Mukandavire\thanks{\texttt{zindoga.mukandavire@coventry.ac.uk}}}%
+}
+\author[1]{%
+    \href{https://orcid.org/0000-0000-0000-0000}{\usebox{\orcid}\hspace{1mm}Seyed Mousavi\thanks{\texttt{seyed.mousavi@coventry.ac.uk}}}%
+}
+\affil[1]{Centre for Computational Science and Mathematical Modelling, Coventry University, Coventry, United Kingdom}
+\affil[2]{Centre for Healthcare and Communities, Coventry University, Coventry, United Kingdom; Institute of Applied Research and Technology, Dubai International Academic City, Dubai, UAE}
+\affil[3]{Centre for Computational Science and Mathematical Modelling, Coventry University, Coventry, United Kingdom}
 \fi
 
 % Uncomment to override  the `A preprint' in the header
