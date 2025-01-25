@@ -2,11 +2,10 @@
 # coding: utf-8
 
 """
-st_transformer_multigraph.py
+st_transformer_multigraph_temporal_cross_attention_pyg.py
 
-Spatiotemporal Transformer + Multi-Graph GNN (Enhanced Version)
-===============================================================
-
+Spatiotemporal Transformer + Graph Attention Networks (GAT) with Temporal Cross Attention using PyTorch Geometric
+==================================================================================================
 This script implements an enhanced spatiotemporal forecasting model that:
 1. Uses MinMax scaling for data normalization (applied to the target variable).
 2. Incorporates multiple forecast horizons (3, 7, 14 days).
@@ -16,12 +15,13 @@ This script implements an enhanced spatiotemporal forecasting model that:
 
 The model architecture includes:
 - A Transformer-based temporal encoder for capturing global temporal dependencies.
-- Multi-graph adjacency fusion (geographic, correlation, dynamic).
-- A Graph Neural Network (GNN) stack for spatial dependencies.
+- Temporal Cross Attention for dynamic adjacency learning.
+- A Graph Attention Network (GAT) stack using PyTorch Geometric for spatial dependencies.
 - Output layers for multiple forecast horizons.
 
-Author: [Your Name or Group], [Year]
-License: [MIT or other]
+Author: Your Name
+Date: 2025-01-24
+License: MIT
 """
 
 # ==============================================================================
@@ -36,11 +36,10 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
-import networkx as nx
 
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
+import torch.nn.functional as F  # Ensure this is not shadowed
 import torch.optim as optim
 from torch.nn import Parameter
 from torch.utils.data import Dataset, DataLoader, Subset
@@ -48,7 +47,11 @@ from torch.utils.data import Dataset, DataLoader, Subset
 from sklearn.metrics import mean_absolute_error, mean_squared_error
 from scipy.stats import pearsonr
 from sklearn.preprocessing import MinMaxScaler
-import matplotlib.dates as mdates
+
+# PyTorch Geometric Imports
+import torch_geometric.nn as pyg_nn
+from torch_geometric.data import Data
+from torch_geometric.loader import DataLoader as GeometricDataLoader
 
 # Matplotlib style
 plt.style.use('seaborn-v0_8-paper')
@@ -112,7 +115,36 @@ def haversine(lat1, lon1, lat2, lon2):
     a = sin(dlat/2)**2 + cos(lat1)*cos(lat2)*sin(dlon/2)**2
     c = 2 * asin(sqrt(a))
     r = 6371  # Earth radius in kilometers
-    return c*r
+    return c * r
+
+def get_batched_edge_index(adj, batch_size):
+    """
+    Convert a batch of adjacency matrices to batched edge indices.
+
+    Args:
+        adj: Tensor of shape [B, m, m], binary adjacency matrices.
+        batch_size: int, number of graphs in the batch.
+
+    Returns:
+        edge_index: Tensor of shape [2, E_total], concatenated edge indices.
+        batch: Tensor of shape [B * m], indicating graph index for each node.
+    """
+    edge_indices = []
+    for b in range(batch_size):
+        adj_b = adj[b]  # [m, m]
+        src, dst = adj_b.nonzero(as_tuple=True)  # Indices where adj=1
+        src = src + b * adj.size(1)  # Offset for batching
+        dst = dst + b * adj.size(1)
+        if len(src) > 0:
+            edge_indices.append(torch.stack([src, dst], dim=0))
+    if edge_indices:
+        edge_index = torch.cat(edge_indices, dim=1).long()  # [2, E_total]
+    else:
+        edge_index = torch.empty((2, 0), dtype=torch.long).to(adj.device)
+    # Create batch vector
+    num_nodes = adj.size(1)
+    batch = torch.arange(batch_size).repeat_interleave(num_nodes).to(adj.device)  # [B * m]
+    return edge_index, batch
 
 def load_and_compute_adjacencies(
     data: pd.DataFrame,
@@ -162,16 +194,16 @@ def load_and_compute_adjacencies(
         latitudes.append(lat)
         longitudes.append(lon)
 
-    A_geo_np = np.zeros((m,m), dtype=np.float32)
+    A_geo_np = np.zeros((m, m), dtype=np.float32)
     for i in range(m):
         for j in range(m):
             if i == j:
-                A_geo_np[i,j] = 1.
+                A_geo_np[i, j] = 1.
             else:
                 dist = haversine(latitudes[i], longitudes[i], latitudes[j], longitudes[j])
                 if dist <= threshold_distance:
-                    A_geo_np[i,j] = 1.
-                    A_geo_np[j,i] = 1.
+                    A_geo_np[i, j] = 1.
+                    A_geo_np[j, i] = 1.
     A_geo = torch.tensor(A_geo_np, dtype=torch.float32)
 
     # 2) Correlation adjacency
@@ -183,6 +215,9 @@ def load_and_compute_adjacencies(
 
     return data, A_geo, A_corr
 
+# ==============================================================================
+# 2. Dataset Definitions
+# ==============================================================================
 class MyCovidDataset(Dataset):
     """
     Dataset class for COVID-19 data.
@@ -217,7 +252,7 @@ class MyCovidDataset(Dataset):
         if scaler is not None:
             self.scaler = scaler
             # Scale only the target feature ('covidOccupiedMVBeds')
-            self.feature_array[:,:,4] = self.scaler.fit_transform(
+            self.feature_array[:,:,4] = self.scaler.transform(
                 self.feature_array[:,:,4].reshape(-1, 1)
             ).reshape(self.feature_array[:,:,4].shape)
         else:
@@ -232,7 +267,7 @@ class MyCovidDataset(Dataset):
         return torch.tensor(X, dtype=torch.float32), torch.tensor(Y, dtype=torch.float32)
 
 # ==============================================================================
-# 2. Model Definitions
+# 3. Model Definitions
 # ==============================================================================
 class TransformerTemporalEncoder(nn.Module):
     """
@@ -247,7 +282,8 @@ class TransformerTemporalEncoder(nn.Module):
             nhead=nhead,
             dim_feedforward=dim_feedforward,
             dropout=dropout,
-            activation='relu'
+            activation='relu',
+            batch_first=True  # Set batch_first=True to align with data
         )
         self.transformer_encoder = nn.TransformerEncoder(encoder_layer, num_layers=num_layers)
 
@@ -256,85 +292,60 @@ class TransformerTemporalEncoder(nn.Module):
 
     def forward(self, X):
         """
-        X => [B, T_in, m, F]
+        X => [B, T_in, m, C]
         Output => [B, m, d_model]
         """
-        B, T_in, m, F = X.shape
-        X_reshaped = X.permute(0,2,1,3)  # => [B, m, T_in, F]
+        B, T_in, m, C = X.shape
+        X_reshaped = X.permute(0,2,1,3)  # => [B, m, T_in, C]
         Bm = B * m
-        X_reshaped = X_reshaped.reshape(Bm, T_in, F)  # => [Bm, T_in, F]
+        X_reshaped = X_reshaped.reshape(Bm, T_in, C)  # => [Bm, T_in, C]
         X_proj = self.input_proj(X_reshaped)          # => [Bm, T_in, d_model]
-        X_proj = X_proj.permute(1,0,2)                # => [T_in, Bm, d_model]
-
-        out_tf = self.transformer_encoder(X_proj)     # => [T_in, Bm, d_model]
-        out_pool = torch.mean(out_tf, dim=0)          # => [Bm, d_model]
+        # No need to permute for batch_first=True
+        out_tf = self.transformer_encoder(X_proj)     # => [Bm, T_in, d_model]
+        out_pool = torch.mean(out_tf, dim=1)          # [Bm, d_model]
         out_final = out_pool.reshape(B, m, self.d_model)
         return out_final
 
-class GraphLearner(nn.Module):
+class TemporalCrossAttention(nn.Module):
     """
-    Learns dynamic adjacency matrices from node embeddings.
+    Temporal Cross Attention module to compute dynamic adjacency based on node embeddings.
     """
-    def __init__(self, hidden_dim, alpha=1.0):
+    def __init__(self, d_model, num_heads=4, dropout=0.1):
         super().__init__()
-        self.lin1 = nn.Linear(hidden_dim, hidden_dim)
-        self.lin2 = nn.Linear(hidden_dim, hidden_dim)
-        self.alpha = alpha
+        self.query_proj = nn.Linear(d_model, d_model)
+        self.key_proj   = nn.Linear(d_model, d_model)
+        self.value_proj = nn.Linear(d_model, d_model)
+        self.attention = nn.MultiheadAttention(d_model, num_heads, dropout=dropout, batch_first=True)
+        self.dropout = nn.Dropout(dropout)
+        self.norm = nn.LayerNorm(d_model)
 
-    def forward(self, emb):
+    def forward(self, node_emb):
         """
-        emb => [B, m, hidR]
-        returns => [B, m, m]
+        node_emb: [B, m, d_model]
+        returns: [B, m, m] dynamic adjacency
         """
-        B, m, hd = emb.shape
-        x1 = torch.tanh(self.alpha * self.lin1(emb))
-        x2 = torch.tanh(self.alpha * self.lin2(emb))
-        adj = torch.bmm(x1, x2.transpose(1,2)) - torch.bmm(x2, x1.transpose(1,2))
-        adj = self.alpha * adj
-        adj = torch.relu(torch.tanh(adj))
-        return adj
+        Q = self.query_proj(node_emb)  # [B, m, d_model]
+        K = self.key_proj(node_emb)    # [B, m, d_model]
+        V = self.value_proj(node_emb)  # [B, m, d_model]
 
-class GraphConvLayer(nn.Module):
-    """
-    Graph Convolutional Layer with ELU activation.
-    """
-    def __init__(self, in_features, out_features):
-        super().__init__()
-        self.weight = Parameter(torch.Tensor(in_features, out_features))
-        self.bias = Parameter(torch.Tensor(out_features))
-        nn.init.xavier_uniform_(self.weight)
-        bound = 1.0 / math.sqrt(out_features)
-        self.bias.data.uniform_(-bound, bound)
-        self.act = nn.ELU()
+        # Compute attention scores
+        attn_output, attn_weights = self.attention(Q, K, V, need_weights=True)  # attn_weights: [B, m, m]
 
-    def forward(self, x, adj):
-        """
-        x => [B, m, in_features]
-        adj => [B, m, m]
-        output => [B, m, out_features]
-        """
-        support = torch.matmul(x, self.weight)  # [B, m, out_features]
-        out = torch.bmm(adj, support) + self.bias
-        return self.act(out)
+        # Apply dropout to attention weights
+        attn_weights = self.dropout(attn_weights)
 
-def getLaplaceMat(B, m, adj):
-    """
-    Row-normalize adjacency matrix.
-    """
-    i_mat = torch.eye(m, device=adj.device).unsqueeze(0).expand(B, m, m)
-    adj_bin = (adj > 0).float()
-    deg = torch.sum(adj_bin, dim=2)  # [B, m]
-    deg_inv = 1.0 / (deg + 1e-12)
-    deg_inv_mat = i_mat * deg_inv.unsqueeze(2)  # [B, m, m]
-    lap_mat = torch.bmm(deg_inv_mat, adj_bin)  # [B, m, m]
-    return lap_mat
+        # Optionally, apply a non-linearity or scaling to attention weights
+        # For adjacency, we can use the raw attention weights or apply a sigmoid to bound them
+        adj_dynamic = torch.sigmoid(attn_weights)  # [B, m, m]
 
-class MultiGraphSTModel(nn.Module):
+        return adj_dynamic
+
+class MultiGraphSTModelTemporalCrossAttention_PyG(nn.Module):
     """
     Spatiotemporal model with:
     1) Transformer for temporal dimension,
-    2) Multi-graph adjacency (geo, corr, dynamic),
-    3) GNN stack,
+    2) Temporal Cross Attention for dynamic adjacency,
+    3) GAT stack using PyTorch Geometric,
     4) Final projection => T_out day forecast.
     """
     def __init__(
@@ -346,7 +357,8 @@ class MultiGraphSTModel(nn.Module):
         hidden_dim_gnn=32,
         num_gnn_layers=2,
         dropout=0.1,
-        device='cpu'
+        device='cpu',
+        gat_heads=1
     ):
         super().__init__()
         self.num_nodes = num_nodes
@@ -358,68 +370,103 @@ class MultiGraphSTModel(nn.Module):
             dim_feedforward=4*d_model, dropout=dropout
         )
 
-        # 2) Dynamic adjacency
-        self.graph_learner = GraphLearner(d_model, alpha=1.0)
+        # 2) Temporal Cross Attention for dynamic adjacency
+        self.temporal_cross_attention = TemporalCrossAttention(
+            d_model=d_model, num_heads=nhead, dropout=dropout
+        )
 
         # Gating parameters for multi-graph
         self.g_geo  = nn.Parameter(torch.tensor(0.5, dtype=torch.float32))
         self.g_corr = nn.Parameter(torch.tensor(0.5, dtype=torch.float32))
 
-        # GNN stack
+        # GAT stack using PyTorch Geometric's GATConv
         self.num_gnn_layers = num_gnn_layers
         self.gnn_layers = nn.ModuleList([
-            GraphConvLayer(d_model if i==0 else hidden_dim_gnn, hidden_dim_gnn)
+            pyg_nn.GATConv(
+                in_channels=d_model if i==0 else hidden_dim_gnn * gat_heads,
+                out_channels=hidden_dim_gnn,
+                heads=gat_heads,
+                dropout=dropout,
+                concat=True  # Concatenate heads' outputs
+            )
             for i in range(num_gnn_layers)
         ])
 
         # Final projection for forecast
-        self.output_fc = nn.Linear(hidden_dim_gnn, num_timesteps_output)
+        self.output_fc = nn.Linear(hidden_dim_gnn * gat_heads, num_timesteps_output)
 
     def forward(self, X, A_geo, A_corr):
         """
-        X => [B, T_in, m, F]
+        X => [B, T_in, m, C]
         A_geo => [m, m] on device
         A_corr=> [m, m] on device
         Output => [B, T_out, m]
         """
-        B, T_in, m, F = X.shape
+        B, T_in, m, C = X.shape
+
         # 1) Get node embeddings from transformer => [B, m, d_model]
         node_emb = self.transformer(X)
 
-        # 2) Dynamic adjacency => [B, m, m]
-        A_dyn = self.graph_learner(node_emb)
+        # 2) Compute dynamic adjacency via Temporal Cross Attention => [B, m, m]
+        A_dyn = self.temporal_cross_attention(node_emb)
 
         # 3) Fuse multi-graph
-        A_geo_b = A_geo.unsqueeze(0).repeat(B,1,1)   # => [B,m,m]
-        A_corr_b= A_corr.unsqueeze(0).repeat(B,1,1)  # => [B,m,m]
-        # Gating
+        A_geo_b = A_geo.unsqueeze(0).repeat(B,1,1)   # [B, m, m]
+        A_corr_b = A_corr.unsqueeze(0).repeat(B,1,1) # [B, m, m]
         A_fused = self.g_geo * A_geo_b + self.g_corr * A_corr_b + A_dyn
-        A_fused = torch.clamp(A_fused, 0, 1)
+        A_fused = torch.clamp(A_fused, 0, 1)  # Ensure adjacency weights are between 0 and 1
 
-        # 4) Row-normalize
-        lap_mat = getLaplaceMat(B, m, A_fused)
+        # 4) Convert fused adjacency matrices to edge_index and batch
+        edge_index, batch = get_batched_edge_index(A_fused, B)  # [2, E_total], [B * m]
 
-        # 5) GNN stack
-        x = node_emb  # [B, m, d_model]
-        for gnn in self.gnn_layers:
-            x = gnn(x, lap_mat)  # [B, m, hidden_dim_gnn]
+        # 5) Flatten node embeddings for all graphs in the batch
+        x = node_emb.view(B * m, -1)  # [B * m, d_model]
 
-        # 6) Final projection => [B, m, T_out]
-        out_m = self.output_fc(x)
-        out = out_m.permute(0,2,1)  # => [B, T_out, m]
+        # 6) Apply GAT layers
+        for idx, gat in enumerate(self.gnn_layers):
+            x = gat(x, edge_index)  # [B * m, hidden_dim_gnn * heads]
+            x = F.elu(x)            # Activation
+
+        # 7) Reshape back to [B, m, hidden_dim_gnn * heads]
+        x = x.view(B, m, -1)  # [B, m, hidden_dim_gnn * heads]
+
+        # 8) Final projection => [B, m, T_out]
+        out_m = self.output_fc(x)  # [B, m, T_out]
+        out = out_m.permute(0,2,1) # [B, T_out, m]
         return out
 
 # ==============================================================================
-# 3. Training, Validation, Testing, and Plotting
+# 4. Training, Validation, Testing, and Plotting
 # ==============================================================================
-def initialize_model(num_nodes, device):
-    model = MultiGraphSTModel(num_nodes=num_nodes).to(device)
+def initialize_model_temporal_cross_attention_pyg(num_nodes, device, gat_heads=1):
+    """
+    Initializes the MultiGraphSTModelTemporalCrossAttention_PyG model with specified hyperparameters.
+
+    Args:
+        num_nodes (int): Number of nodes (regions).
+        device (torch.device): Device to run the model on.
+        gat_heads (int): Number of attention heads in GAT layers.
+
+    Returns:
+        model, optimizer, criterion, scheduler
+    """
+    model = MultiGraphSTModelTemporalCrossAttention_PyG(
+        num_nodes=num_nodes,
+        d_model=32,
+        nhead=4,
+        num_transformer_layers=2,
+        hidden_dim_gnn=32,
+        num_gnn_layers=2,
+        dropout=0.1,
+        device=device,
+        gat_heads=gat_heads
+    ).to(device)
     optimizer = optim.AdamW(model.parameters(), lr=learning_rate, weight_decay=1e-4)
     criterion = nn.MSELoss()
     scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=3)
     return model, optimizer, criterion, scheduler
 
-def train_val_test(
+def train_val_test_temporal_cross_attention_pyg(
     model, optimizer, criterion, scheduler,
     train_loader, val_loader, test_loader,
     A_geo, A_corr,
@@ -427,6 +474,21 @@ def train_val_test(
 ):
     """
     Train the model and evaluate on validation and test sets.
+
+    Args:
+        model (nn.Module): The spatiotemporal model.
+        optimizer (torch.optim.Optimizer): Optimizer.
+        criterion (nn.Module): Loss function.
+        scheduler (torch.optim.lr_scheduler): Learning rate scheduler.
+        train_loader (DataLoader): Training data loader.
+        val_loader (DataLoader): Validation data loader.
+        test_loader (DataLoader): Test data loader.
+        A_geo (torch.Tensor): Geographic adjacency matrix.
+        A_corr (torch.Tensor): Correlation adjacency matrix.
+        experiment_id (int): Identifier for the experiment.
+
+    Returns:
+        dict: Dictionary containing test loss and various metrics.
     """
     best_val_loss = float('inf')
     patience_count = 0
@@ -470,7 +532,7 @@ def train_val_test(
         val_losses.append(avg_val_loss)
         scheduler.step(avg_val_loss)
 
-        print(f"[Epoch {epoch+1}/{num_epochs}] Train Loss: {avg_train_loss:.4f} | Val Loss: {avg_val_loss:.4f}")
+        print(f"[Epoch {epoch+1}/{num_epochs}] Train Loss: {avg_train_loss:.6f} | Val Loss: {avg_val_loss:.6f}")
 
         # Early Stopping
         if avg_val_loss < best_val_loss:
@@ -514,7 +576,7 @@ def train_val_test(
             all_actuals.append(batch_Y.cpu())
 
     avg_test_loss = test_loss / len(test_loader)
-    print(f"[Experiment {experiment_id}] Test MSE Loss: {avg_test_loss:.4f}")
+    print(f"[Experiment {experiment_id}] Test MSE Loss: {avg_test_loss:.6f}")
 
     all_preds = torch.cat(all_preds, dim=0).numpy()    # [samples, T_out, m]
     all_actuals = torch.cat(all_actuals, dim=0).numpy()
@@ -591,7 +653,7 @@ def train_val_test(
             plt.subplot(2, 2, i)
             # Calculate average per Forecast_Horizon
             avg_metrics = metrics_df.groupby('Forecast_Horizon')[metric].mean().reset_index()
-            sns.barplot(x='Forecast_Horizon', y=metric, data=avg_metrics, palette='Set2')
+            sns.barplot(x='Forecast_Horizon', y=metric, data=avg_metrics)
             plt.title(f'Average {metric} across Forecast Horizons')
             plt.ylabel(metric)
             plt.xlabel('Forecast Horizon (days)')
@@ -605,6 +667,7 @@ def train_val_test(
         print(f"[Info] Summary metrics plot saved to {summary_plot}")
 
     plot_overall_metrics(metrics_df, experiment_id)
+    print(f"[Info] Final Results: {metrics_dict}")
 
     return {
         'test_loss': avg_test_loss,
@@ -615,7 +678,7 @@ def train_val_test(
     }
 
 # ==============================================================================
-# 4. Main Execution
+# 5. Main Execution
 # ==============================================================================
 if __name__ == "__main__":
     # A) Load your data
@@ -696,14 +759,14 @@ if __name__ == "__main__":
 
     # D) Initialize model
     num_nodes = dataset.num_nodes
-    model, optimizer, criterion, scheduler = initialize_model(num_nodes, device)
+    model, optimizer, criterion, scheduler = initialize_model_temporal_cross_attention_pyg(num_nodes, device, gat_heads=1)
 
     # E) Train/Val/Test
-    results = train_val_test(
+    results = train_val_test_temporal_cross_attention_pyg(
         model, optimizer, criterion, scheduler,
         train_loader, val_loader, test_loader,
         A_geo, A_corr,
         experiment_id=1
     )
 
-    print("[Info] Final Results:", results)
+    print(f"[Info] Final Results: {results}")
