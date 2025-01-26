@@ -53,7 +53,8 @@ class GATLayer(nn.Module):
         src = adj[0]
         dst = adj[1]
         att_feat = torch.cat((z[src], z[dst]), dim=-1)  # [E, 2*out_dim]
-        att_edge = F.leaky_relu(self.attn_fc(att_feat)).squeeze(-1)  # [E]
+        att_edge = F.leaky_relu(self.attn_fc(att_feat))  # [E, 1]
+        # Removed .squeeze(-1) to maintain shape [E, 1]
 
         # Weighted sum
         output = self.conv(z, adj, att_edge)

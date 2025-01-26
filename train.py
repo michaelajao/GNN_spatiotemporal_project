@@ -377,6 +377,12 @@ for epoch in tqdm(range(epoch_count), desc='Training Epochs'):
         # states => shape [B*nLoc, 2]
         states = torch.cat([batch_I, batch_R], dim=-1).view(-1,2)  # [52, 2]
 
+        # Debugging: Print tensor shapes
+        # print(f"Dynamic shape: {dynamic.shape}")
+        # print(f"Edge Index shape: {edge_index.shape}")
+        # print(f"States shape: {states.shape}")
+        # print(f"N shape: {N.shape}")
+
         predictions, phy_predictions = model(
             X=dynamic, 
             adj=edge_index, 
@@ -438,6 +444,7 @@ for epoch in tqdm(range(epoch_count), desc='Training Epochs'):
             phy_I  = phy_predictions[:,:,0]  # [52,15]
             phy_R  = phy_predictions[:,:,1]  # [52,15]
 
+            # Loss
             loss = (criterion(pred_I, batch_yI.view(nLoc, pred_window)) +
                     criterion(pred_R, batch_yR.view(nLoc, pred_window)) +
                     scale * criterion(phy_I, batch_yI.view(nLoc, pred_window)) +
