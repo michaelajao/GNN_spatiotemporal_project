@@ -12,7 +12,7 @@ import requests
 
 # Add the utils directory to sys.path
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'utils'))
-from utils import get_data_location  # Ensure this function is correctly implemented
+from utils.utils import get_data_location  # Ensure this function is correctly implemented
 
 def download_data(url):
     """
