@@ -2,7 +2,7 @@
 
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
+from torch.nn import functional as F
 from torch_geometric.nn.conv import MessagePassing
 from torch.nn import ModuleList
 
@@ -28,9 +28,9 @@ class WeightedSumConv(MessagePassing):
         :param edge_attr: [E, 1], attention scores
         :return: [N, d], updated node features
         """
-        # Key fix: If no edges, return a zero tensor with same shape as input
+        # Key fix: If no edges, just return the input x to avoid empty aggregator
         if edge_index.size(1) == 0:
-            return torch.zeros_like(x)
+            return x
 
         return self.propagate(edge_index, x=x, edge_attr=edge_attr)
 
@@ -66,6 +66,9 @@ class GATLayer(nn.Module):
         self.reset_parameters()
 
     def reset_parameters(self):
+        """
+        Initializes the weights of the layer.
+        """
         gain = nn.init.calculate_gain('relu')
         nn.init.xavier_normal_(self.fc.weight, gain=gain)
         nn.init.xavier_normal_(self.attn_fc.weight, gain=gain)
@@ -170,16 +173,15 @@ class STAN(nn.Module):
         X = X.permute(0, 2, 1, 3).contiguous()  
         X = X.view(B*nLoc, T*F)
 
-        # GAT layers with explicit error checking
+        # GAT layers
         cur_h = self.layer1(adj, X)
-        if not isinstance(cur_h, torch.Tensor):
-            raise TypeError(f"layer1 returned {type(cur_h)}, expected torch.Tensor")
-        cur_h = F.elu(cur_h)
+        cur_h = cur_h.float().to(self.device)
+        elu = nn.ELU()
+        cur_h = elu(cur_h)
 
         cur_h = self.layer2(adj, cur_h)
-        if not isinstance(cur_h, torch.Tensor):
-            raise TypeError(f"layer2 returned {type(cur_h)}, expected torch.Tensor")
-        cur_h = F.elu(cur_h)
+        cur_h = cur_h.float().to(self.device)
+        cur_h = elu(cur_h)
 
         # GRU
         cur_h = cur_h.unsqueeze(1)  # [B*nLoc, 1, gat_dim2]
@@ -191,7 +193,7 @@ class STAN(nn.Module):
             h_out,
             last_diff_I.view(B*nLoc, 1),
             last_diff_R.view(B*nLoc, 1)
-        ], dim=1)
+        ], dim=1)  # [B*nLoc, gru_dim + 2]
 
         # Data-driven predictions
         pred_I = self.nn_res_I(hc).unsqueeze(-1)  # [B*nLoc, horizon, 1]
@@ -200,12 +202,12 @@ class STAN(nn.Module):
         # Physical SIR predictions
         alpha_beta = self.nn_res_sir(hc)          # [B*nLoc, 2]
         alpha = torch.sigmoid(alpha_beta[:, 0]).unsqueeze(1)  # [B*nLoc,1]
-        beta  = torch.sigmoid(alpha_beta[:, 1]).unsqueeze(1)
+        beta  = torch.sigmoid(alpha_beta[:, 1]).unsqueeze(1)  # [B*nLoc,1]
 
         # Handle population
         if N is None:
             # Use global pop if not provided
-            N = torch.tensor([self.pop], dtype=torch.float32, device=X.device).repeat(B*nLoc,1)
+            N = torch.tensor([self.pop], dtype=torch.float32, device=X.device).repeat(B*nLoc,1)  # [B*nLoc,1]
         else:
             if isinstance(N, torch.Tensor):
                 if N.dim() == 2 and N.size(0) == nLoc:
@@ -214,9 +216,7 @@ class STAN(nn.Module):
                     raise ValueError(f"Population tensor N has unexpected shape: {N.shape}")
             else:
                 # Scalar
-                N_val = N
-                N = torch.tensor([N_val], dtype=torch.float32, device=X.device)
-                N = N.repeat(B*nLoc,1)
+                N = torch.tensor([N], dtype=torch.float32, device=X.device).repeat(B*nLoc,1)  # [B*nLoc,1]
 
         # Physical Model Forward
         phy_I_list = []
@@ -238,7 +238,7 @@ class STAN(nn.Module):
             last_R = last_R + dR.detach()
 
         phy_I = torch.stack(phy_I_list, dim=1).unsqueeze(-1)  # [B*nLoc, horizon,1]
-        phy_R = torch.stack(phy_R_list, dim=1).unsqueeze(-1)
+        phy_R = torch.stack(phy_R_list, dim=1).unsqueeze(-1)  # [B*nLoc, horizon,1]
 
         return (
             torch.cat([pred_I, pred_R], dim=-1),

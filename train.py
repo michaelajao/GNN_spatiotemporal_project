@@ -18,8 +18,8 @@ from tqdm import tqdm
 from haversine import haversine
 
 # Local imports
-from src.utils.utils import gravity_law_commute_dist  # Ensure path is correct
-from model import STAN  # Ensure model.py is in the same directory or adjust import path
+from src.utils.utils import gravity_law_commute_dist  # Ensure this path is correct
+from model import STAN  # Ensure model.py is in the same directory or adjust the import accordingly
 
 ###############################################################################
 #                             1) Reproducibility                              #
@@ -38,6 +38,7 @@ def seed_torch(seed=RANDOM_SEED):
     if torch.cuda.is_available():
         torch.cuda.manual_seed(seed)
         torch.cuda.manual_seed_all(seed)
+    # Ensure deterministic behavior
     torch.backends.cudnn.benchmark = False
     torch.backends.cudnn.deterministic = True
 
@@ -55,9 +56,11 @@ print(f"Using device: {device}")
 ###############################################################################
 
 # 3.1 Load COVID-19 data
+# Ensure that 'data/state_covid_data.csv' exists and is correctly formatted
 raw_data = pd.read_csv('data/state_covid_data.csv')
 
 # 3.2 Load population and geographic data
+# Ensure that 'data/uszips.csv' exists and contains necessary columns
 pop_data = pd.read_csv('data/uszips.csv')
 pop_data = pop_data.groupby('state_name').agg({
     'population': 'sum',
@@ -134,6 +137,7 @@ edge_index = torch.stack([edge_src, edge_dst], dim=0)
 self_loops = torch.arange(0, num_locations, dtype=torch.long).unsqueeze(0).repeat(2,1)
 edge_index = torch.cat([edge_index, self_loops], dim=1)
 
+# Move edge_index to the appropriate device
 edge_index = edge_index.to(device)
 
 ###############################################################################
@@ -234,7 +238,7 @@ susceptible_cases = np.array(susceptible_cases)
 static_feat       = np.array(static_feat)
 
 print(f"Static features shape: {static_feat.shape}") 
-# e.g. [52,4]
+# e.g., [52,4]
 
 # 7.1 Compute daily differences
 dI = np.diff(active_cases, axis=1, prepend=0)
@@ -246,7 +250,8 @@ print(f"dR shape: {dR.shape}")
 print(f"dS shape: {dS.shape}")
 
 dynamic_feat = np.stack([dI, dR, dS], axis=-1)
-print(f"Dynamic features shape: {dynamic_feat.shape}")
+print(f"Dynamic features shape: {dynamic_feat.shape}") 
+# e.g., [52,213,3]
 
 # 7.2 Visualize adjacency and heatmap
 visualize_adjacency(adj_map, loc_list, state_to_index, static_feat)
@@ -416,20 +421,26 @@ model = STAN(
 optimizer = optim.Adam(model.parameters(), lr=1e-2)
 criterion = nn.MSELoss()
 
-N = torch.tensor(static_feat[:,0], dtype=torch.float32, device=device).unsqueeze(-1)
+# Create population tensor N: [nLoc, 1]
+N = torch.tensor(static_feat[:,0], dtype=torch.float32, device=device).unsqueeze(-1)  # [52,1]
 
 ###############################################################################
 #                        14) Training Parameters                             #
 ###############################################################################
 
 epoch_count = 50 if normalize else 300
-scale = 0.1
+scale = 0.1  # Scale factor for physical consistency
 best_val = float('inf')
 file_name = './save/stan.pth'
 os.makedirs('./save', exist_ok=True)
 
 train_losses = []
 val_losses   = []
+
+# 1. Import necessary metrics
+from scipy.stats import pearsonr
+import numpy as np
+from sklearn.metrics import mean_squared_error, mean_absolute_error
 
 ###############################################################################
 #                                15) Training Loop                             #
@@ -438,7 +449,11 @@ val_losses   = []
 for epoch in tqdm(range(epoch_count), desc='Training Epochs'):
     model.train()
     epoch_loss = 0.0
-
+    train_preds_I = []
+    train_preds_R = []
+    train_true_I = []
+    train_true_R = []
+    
     for (batch_x, batch_I, batch_R, batch_yI, batch_yR) in train_loader:
         optimizer.zero_grad()
 
@@ -452,10 +467,10 @@ for epoch in tqdm(range(epoch_count), desc='Training Epochs'):
 
         B    = batch_x.size(0) 
         nLoc = batch_x.size(1)
-        dynamic = batch_x.view(B, nLoc, history_window, 3).permute(0, 2, 1, 3).contiguous()
-        states = torch.cat([batch_I, batch_R], dim=-1).view(-1, 2)
+        dynamic = batch_x.view(B, nLoc, history_window, 3).permute(0, 2, 1, 3).contiguous()  # [1,6,52,3]
+        states = torch.cat([batch_I, batch_R], dim=-1).view(-1, 2)  # [52,2]
 
-        # Forward
+        # Forward pass
         predictions, phy_predictions = model(
             X=dynamic, 
             adj=edge_index, 
@@ -464,12 +479,13 @@ for epoch in tqdm(range(epoch_count), desc='Training Epochs'):
         )
         # predictions => [52, 15, 2]
 
-        pred_I = predictions[:,:,0]
-        pred_R = predictions[:,:,1]
-        phy_I  = phy_predictions[:,:,0]
-        phy_R  = phy_predictions[:,:,1]
+        # Extract predictions
+        pred_I = predictions[:,:,0]  # [52,15]
+        pred_R = predictions[:,:,1]  # [52,15]
+        phy_I  = phy_predictions[:,:,0]  # [52,15]
+        phy_R  = phy_predictions[:,:,1]  # [52,15]
 
-        # Normalize targets for MSE
+        # Normalize targets using the same mean and std
         yI_normalized = []
         yR_normalized = []
         for i, loc_name in enumerate(loc_list):
@@ -478,26 +494,82 @@ for epoch in tqdm(range(epoch_count), desc='Training Epochs'):
             yR_norm = (batch_yR[0, i, :].cpu().numpy() - mR) / sR
             yI_normalized.append(yI_norm)
             yR_normalized.append(yR_norm)
-        yI_normalized = torch.tensor(yI_normalized, dtype=torch.float32, device=device)
-        yR_normalized = torch.tensor(yR_normalized, dtype=torch.float32, device=device)
+        yI_normalized = torch.tensor(yI_normalized, dtype=torch.float32, device=device)  # [52,15]
+        yR_normalized = torch.tensor(yR_normalized, dtype=torch.float32, device=device)  # [52,15]
 
+        # Compute loss
         loss = (criterion(pred_I, yI_normalized) +
                 criterion(pred_R, yR_normalized) +
                 scale * criterion(phy_I, yI_normalized) +
                 scale * criterion(phy_R, yR_normalized))
-
         loss.backward()
         optimizer.step()
         epoch_loss += loss.item()
 
-    epoch_loss /= len(train_loader)
-    train_losses.append(epoch_loss)
+        # Collect predictions and true values for metrics
+        train_preds_I.append(pred_I.detach().cpu().numpy())
+        train_preds_R.append(pred_R.detach().cpu().numpy())
+        train_true_I.append(yI_normalized.cpu().numpy())
+        train_true_R.append(yR_normalized.cpu().numpy())
 
-    # Validation
+    # Concatenate all batches
+    train_preds_I = np.concatenate(train_preds_I, axis=0)  # [52,15]
+    train_preds_R = np.concatenate(train_preds_R, axis=0)  # [52,15]
+    train_true_I = np.concatenate(train_true_I, axis=0)    # [52,15]
+    train_true_R = np.concatenate(train_true_R, axis=0)    # [52,15]
+
+    # Compute RMSE
+    train_rmse_I = np.sqrt(mean_squared_error(train_true_I, train_preds_I))
+    train_rmse_R = np.sqrt(mean_squared_error(train_true_R, train_preds_R))
+
+    # Compute Pearson CC with error handling
+    train_pearson_I = 0.0
+    train_pearson_R = 0.0
+    valid_I = 0
+    valid_R = 0
+    
+    for i in range(train_true_I.shape[0]):
+        try:
+            if np.var(train_true_I[i]) == 0 or np.var(train_preds_I[i]) == 0:
+                continue
+            corr = pearsonr(train_true_I[i], train_preds_I[i])[0]
+            if not np.isnan(corr):
+                train_pearson_I += corr
+                valid_I += 1
+        except:
+            continue
+            
+    if valid_I > 0:
+        train_pearson_I /= valid_I
+    else:
+        train_pearson_I = 0.0
+        
+    for i in range(train_true_R.shape[0]):
+        try:
+            if np.var(train_true_R[i]) == 0 or np.var(train_preds_R[i]) == 0:
+                continue
+            corr = pearsonr(train_true_R[i], train_preds_R[i])[0]
+            if not np.isnan(corr):
+                train_pearson_R += corr
+                valid_R += 1
+        except:
+            continue
+            
+    if valid_R > 0:
+        train_pearson_R /= valid_R
+    else:
+        train_pearson_R = 0.0
+
+    # ---------------- Validation ---------------- #
     model.eval()
     val_loss = 0.0
+    val_preds_I = []
+    val_preds_R = []
+    val_true_I = []
+    val_true_R = []
     with torch.no_grad():
         for (batch_x, batch_I, batch_R, batch_yI, batch_yR) in val_loader:
+            # Move data to device
             batch_x, batch_I, batch_R, batch_yI, batch_yR = (
                 batch_x.to(device),
                 batch_I.to(device),
@@ -506,12 +578,15 @@ for epoch in tqdm(range(epoch_count), desc='Training Epochs'):
                 batch_yR.to(device)
             )
 
-            B    = batch_x.size(0)
-            nLoc = batch_x.size(1)
-            dynamic = batch_x.view(B, nLoc, history_window, 3).permute(0, 2, 1, 3).contiguous()
-            states = torch.cat([batch_I, batch_R], dim=-1).view(-1, 2)
+            # Reshape dynamic features
+            B    = batch_x.size(0)      # 1
+            nLoc = batch_x.size(1)      # 52
+            dynamic = batch_x.view(B, nLoc, history_window, 3).permute(0, 2, 1, 3).contiguous()  # [1,6,52,3]
 
-            # Forward
+            # Concatenate I and R states: [52,2]
+            states = torch.cat([batch_I, batch_R], dim=-1).view(-1, 2)  # [52,2]
+
+            # Forward pass
             predictions, phy_predictions = model(
                 X=dynamic, 
                 adj=edge_index, 
@@ -519,10 +594,11 @@ for epoch in tqdm(range(epoch_count), desc='Training Epochs'):
                 N=N
             )
 
-            pred_I = predictions[:,:,0]
-            pred_R = predictions[:,:,1]
-            phy_I  = phy_predictions[:,:,0]
-            phy_R  = phy_predictions[:,:,1]
+            # Extract predictions
+            pred_I = predictions[:,:,0]  # [52,15]
+            pred_R = predictions[:,:,1]  # [52,15]
+            phy_I  = phy_predictions[:,:,0]  # [52,15]
+            phy_R  = phy_predictions[:,:,1]  # [52,15]
 
             # Normalize targets
             yI_normalized = []
@@ -533,27 +609,80 @@ for epoch in tqdm(range(epoch_count), desc='Training Epochs'):
                 yR_norm = (batch_yR[0, i, :].cpu().numpy() - mR) / sR
                 yI_normalized.append(yI_norm)
                 yR_normalized.append(yR_norm)
-            yI_normalized = torch.tensor(yI_normalized, dtype=torch.float32, device=device)
-            yR_normalized = torch.tensor(yR_normalized, dtype=torch.float32, device=device)
+            yI_normalized = torch.tensor(yI_normalized, dtype=torch.float32, device=device)  # [52,15]
+            yR_normalized = torch.tensor(yR_normalized, dtype=torch.float32, device=device)  # [52,15]
 
+            # Compute loss
             loss = (criterion(pred_I, yI_normalized) +
                     criterion(pred_R, yR_normalized) +
                     scale * criterion(phy_I, yI_normalized) +
                     scale * criterion(phy_R, yR_normalized))
             val_loss += loss.item()
 
-    val_loss /= len(val_loader)
-    val_losses.append(val_loss)
+            # Collect predictions and true values for metrics
+            val_preds_I.append(pred_I.detach().cpu().numpy())
+            val_preds_R.append(pred_R.detach().cpu().numpy())
+            val_true_I.append(yI_normalized.cpu().numpy())
+            val_true_R.append(yR_normalized.cpu().numpy())
 
-    # Save best
+    # Concatenate all validation batches
+    val_preds_I = np.concatenate(val_preds_I, axis=0)  # [52,15]
+    val_preds_R = np.concatenate(val_preds_R, axis=0)  # [52,15]
+    val_true_I = np.concatenate(val_true_I, axis=0)    # [52,15]
+    val_true_R = np.concatenate(val_true_R, axis=0)    # [52,15]
+
+    # Compute RMSE for validation
+    val_rmse_I = np.sqrt(mean_squared_error(val_true_I, val_preds_I))
+    val_rmse_R = np.sqrt(mean_squared_error(val_true_R, val_preds_R))
+
+    # Compute Pearson CC for validation with error handling
+    val_pearson_I = 0.0
+    val_pearson_R = 0.0
+    valid_I_val = 0
+    valid_R_val = 0
+    
+    for i in range(val_true_I.shape[0]):
+        try:
+            if np.var(val_true_I[i]) == 0 or np.var(val_preds_I[i]) == 0:
+                continue
+            corr = pearsonr(val_true_I[i], val_preds_I[i])[0]
+            if not np.isnan(corr):
+                val_pearson_I += corr
+                valid_I_val += 1
+        except:
+            continue
+            
+    if valid_I_val > 0:
+        val_pearson_I /= valid_I_val
+    else:
+        val_pearson_I = 0.0
+        
+    for i in range(val_true_R.shape[0]):
+        try:
+            if np.var(val_true_R[i]) == 0 or np.var(val_preds_R[i]) == 0:
+                continue
+            corr = pearsonr(val_true_R[i], val_preds_R[i])[0]
+            if not np.isnan(corr):
+                val_pearson_R += corr
+                valid_R_val += 1
+        except:
+            continue
+            
+    if valid_R_val > 0:
+        val_pearson_R /= valid_R_val
+    else:
+        val_pearson_R = 0.0
+
+    # Save the best model based on validation loss
     if val_loss < best_val:
         best_val = val_loss
         torch.save({
             'state_dict': model.state_dict(),
-            'optimizer': optimizer.state_dict()
+            'optimizer': optimizer.state_dict(),
         }, file_name)
 
-    print(f"Epoch [{epoch+1}/{epoch_count}]  Train Loss: {epoch_loss:.4f}  Val Loss: {val_loss:.4f}")
+    # Update print statement to include metrics
+    print(f"Epoch [{epoch+1}/{epoch_count}]  Train Loss: {epoch_loss:.4f}  Val Loss: {val_loss:.4f}  Train RMSE I: {train_rmse_I:.4f}  Train RMSE R: {train_rmse_R:.4f}  Val RMSE I: {val_rmse_I:.4f}  Val RMSE R: {val_rmse_R:.4f}  Train Pearson CC I: {train_pearson_I:.4f}  Train Pearson CC R: {train_pearson_R:.4f}  Val Pearson CC I: {val_pearson_I:.4f}  Val Pearson CC R: {val_pearson_R:.4f}")
 
 ###############################################################################
 #                           16) Plot Training Losses                          #
@@ -583,15 +712,90 @@ model.eval()
 #                             18) Testing and Evaluation                      #
 ###############################################################################
 
+def compute_mse(y_true, y_pred):
+    """Compute Mean Squared Error."""
+    return np.mean((y_true - y_pred)**2)
+
+def compute_mae(y_true, y_pred):
+    """Compute Mean Absolute Error."""
+    return np.mean(np.abs(y_true - y_pred))
+
+def compute_ccc(x, y):
+    """
+    Compute Concordance Correlation Coefficient.
+    CCC = (2 * ρ * σx * σy) / (σx² + σy² + (μx - μy)²)
+    where ρ is Pearson correlation coefficient
+    """
+    mean_x = np.mean(x)
+    mean_y = np.mean(y)
+    var_x = np.var(x)
+    var_y = np.var(y)
+    covar = np.cov(x, y)[0,1]
+    
+    numerator = 2 * covar
+    denominator = var_x + var_y + (mean_x - mean_y)**2
+    
+    return numerator / denominator if denominator != 0 else 0
+
+def compute_metrics_with_ci(true_values, pred_values, n_bootstrap=1000, ci_level=95):
+    """
+    Compute metrics with confidence intervals using bootstrap resampling.
+    """
+    n_samples = len(true_values)
+    
+    # Initialize arrays to store bootstrap results
+    bootstrap_mse = np.zeros(n_bootstrap)
+    bootstrap_mae = np.zeros(n_bootstrap)
+    bootstrap_ccc = np.zeros(n_bootstrap)
+    
+    for i in range(n_bootstrap):
+        # Generate bootstrap indices
+        indices = np.random.choice(n_samples, size=n_samples, replace=True)
+        
+        # Get bootstrap samples
+        true_bootstrap = true_values[indices]
+        pred_bootstrap = pred_values[indices]
+        
+        # Compute metrics for this bootstrap sample
+        bootstrap_mse[i] = compute_mse(true_bootstrap, pred_bootstrap)
+        bootstrap_mae[i] = compute_mae(true_bootstrap, pred_bootstrap)
+        bootstrap_ccc[i] = compute_ccc(true_bootstrap, pred_bootstrap)
+    
+    # Compute confidence intervals
+    ci_lower = (100 - ci_level) / 2
+    ci_upper = 100 - ci_lower
+    
+    results = {
+        'mse': {
+            'mean': np.mean(bootstrap_mse),
+            'ci_lower': np.percentile(bootstrap_mse, ci_lower),
+            'ci_upper': np.percentile(bootstrap_mse, ci_upper)
+        },
+        'mae': {
+            'mean': np.mean(bootstrap_mae),
+            'ci_lower': np.percentile(bootstrap_mae, ci_lower),
+            'ci_upper': np.percentile(bootstrap_mae, ci_upper)
+        },
+        'ccc': {
+            'mean': np.mean(bootstrap_ccc),
+            'ci_lower': np.percentile(bootstrap_ccc, ci_lower),
+            'ci_upper': np.percentile(bootstrap_ccc, ci_upper)
+        }
+    }
+    
+    return results
+
+# Initialize lists to store predictions and ground truth
 test_preds_I = []
 test_preds_R = []
-test_phy_I   = []
-test_phy_R   = []
+test_phy_I = []
+test_phy_R = []
 test_truth_I = []
 test_truth_R = []
 
 with torch.no_grad():
     for (batch_x, batch_I, batch_R, batch_yI, batch_yR) in test_loader:
+        # Move data to device
         batch_x, batch_I, batch_R, batch_yI, batch_yR = (
             batch_x.to(device),
             batch_I.to(device),
@@ -600,16 +804,26 @@ with torch.no_grad():
             batch_yR.to(device)
         )
 
-        B    = batch_x.size(0)
-        nLoc = batch_x.size(1)
-        dynamic = batch_x.view(B, nLoc, history_window, 3).permute(0, 2, 1, 3).contiguous()
-        states = torch.cat([batch_I, batch_R], dim=-1).view(-1, 2)
+        B    = batch_x.size(0)      # 1
+        nLoc = batch_x.size(1)      # 52
+        dynamic = batch_x.view(B, nLoc, history_window, 3).permute(0, 2, 1, 3).contiguous()  # [1,6,52,3]
 
-        predictions, phy_predictions = model(X=dynamic, adj=edge_index, states=states, N=N)
-        pred_I = predictions[:,:,0]
-        pred_R = predictions[:,:,1]
-        phy_I  = phy_predictions[:,:,0]
-        phy_R  = phy_predictions[:,:,1]
+        # Concatenate I and R states: [52, 2]
+        states = torch.cat([batch_I, batch_R], dim=-1).view(-1, 2)  # [52,2]
+
+        # Forward pass
+        predictions, phy_predictions = model(
+            X=dynamic, 
+            adj=edge_index, 
+            states=states, 
+            N=N
+        )
+
+        # Extract predictions
+        pred_I = predictions[:,:,0]  # [52,15]
+        pred_R = predictions[:,:,1]  # [52,15]
+        phy_I  = phy_predictions[:,:,0]  # [52,15]
+        phy_R  = phy_predictions[:,:,1]  # [52,15]
 
         # Denormalize predictions
         pred_I_denorm = []
@@ -627,24 +841,36 @@ with torch.no_grad():
             yI_denorm.append(batch_yI[0, i, :].cpu().numpy())
             yR_denorm.append(batch_yR[0, i, :].cpu().numpy())
 
-        test_preds_I.append(np.array(pred_I_denorm))
-        test_preds_R.append(np.array(pred_R_denorm))
-        test_phy_I.append(np.array(phy_I_denorm))
-        test_phy_R.append(np.array(phy_R_denorm))
-        test_truth_I.append(np.array(yI_denorm))
-        test_truth_R.append(np.array(yR_denorm))
+        # Append to lists
+        test_preds_I.append(np.array(pred_I_denorm))  # [52,15]
+        test_preds_R.append(np.array(pred_R_denorm))  # [52,15]
+        test_phy_I.append(np.array(phy_I_denorm))    # [52,15]
+        test_phy_R.append(np.array(phy_R_denorm))    # [52,15]
+        test_truth_I.append(np.array(yI_denorm))     # [52,15]
+        test_truth_R.append(np.array(yR_denorm))     # [52,15]
 
-test_preds_I = np.concatenate(test_preds_I, axis=0)
-test_preds_R = np.concatenate(test_preds_R, axis=0)
-test_phy_I   = np.concatenate(test_phy_I, axis=0)
-test_phy_R   = np.concatenate(test_phy_R, axis=0)
-test_truth_I = np.concatenate(test_truth_I, axis=0)
-test_truth_R = np.concatenate(test_truth_R, axis=0)
+# Concatenate all batches
+test_preds_I = np.concatenate(test_preds_I, axis=0)    # [52,15]
+test_preds_R = np.concatenate(test_preds_R, axis=0)    # [52,15]
+test_phy_I   = np.concatenate(test_phy_I, axis=0)      # [52,15]
+test_phy_R   = np.concatenate(test_phy_R, axis=0)      # [52,15]
+test_truth_I = np.concatenate(test_truth_I, axis=0)    # [52,15]
+test_truth_R = np.concatenate(test_truth_R, axis=0)    # [52,15]
 
-print("Test Predictions I shape:", test_preds_I.shape)
-print("Test Predictions R shape:", test_preds_R.shape)
-print("Test Ground Truth I shape:", test_truth_I.shape)
-print("Test Ground Truth R shape:", test_truth_R.shape)
+# Compute metrics with confidence intervals for both I and R predictions
+metrics_I = compute_metrics_with_ci(test_truth_I.flatten(), test_preds_I.flatten())
+metrics_R = compute_metrics_with_ci(test_truth_R.flatten(), test_preds_R.flatten())
+
+# Print comprehensive evaluation results
+print("\nEvaluation Results for Active Cases (I):")
+print(f"MSE: {metrics_I['mse']['mean']:.4f} (95% CI: [{metrics_I['mse']['ci_lower']:.4f}, {metrics_I['mse']['ci_upper']:.4f}])")
+print(f"MAE: {metrics_I['mae']['mean']:.4f} (95% CI: [{metrics_I['mae']['ci_lower']:.4f}, {metrics_I['mae']['ci_upper']:.4f}])")
+print(f"CCC: {metrics_I['ccc']['mean']:.4f} (95% CI: [{metrics_I['ccc']['ci_lower']:.4f}, {metrics_I['ccc']['ci_upper']:.4f}])")
+
+print("\nEvaluation Results for Recovered Cases (R):")
+print(f"MSE: {metrics_R['mse']['mean']:.4f} (95% CI: [{metrics_R['mse']['ci_lower']:.4f}, {metrics_R['mse']['ci_upper']:.4f}])")
+print(f"MAE: {metrics_R['mae']['mean']:.4f} (95% CI: [{metrics_R['mae']['ci_lower']:.4f}, {metrics_R['mae']['ci_upper']:.4f}])")
+print(f"CCC: {metrics_R['ccc']['mean']:.4f} (95% CI: [{metrics_R['ccc']['ci_lower']:.4f}, {metrics_R['ccc']['ci_upper']:.4f}])")
 
 ###############################################################################
 #                          19) Visualization Function                        #
@@ -676,16 +902,19 @@ def visualize_predictions(test_preds, test_phy, test_truth, loc_list, case_type=
 #                        20) Visualize Final Predictions                     #
 ###############################################################################
 
+# Visualize Active Cases for first 5 locations
 visualize_predictions(test_preds_I, test_phy_I, test_truth_I, loc_list, 'Active Cases', samples_to_plot=5)
+
+# Visualize Recovered Cases for first 5 locations
 visualize_predictions(test_preds_R, test_phy_R, test_truth_R, loc_list, 'Recovered Cases', samples_to_plot=5)
 
 ###############################################################################
 #                          21) (Optional) Save Predictions                   #
 ###############################################################################
 
+# Uncomment the following lines to save predictions to files
 # np.save('./save/pred_I.npy', test_preds_I)
 # np.save('./save/pred_R.npy', test_preds_R)
 # np.save('./save/phy_I.npy', test_phy_I)
 # np.save('./save/phy_R.npy', test_phy_R)
 # np.save('./save/I_true.npy', test_truth_I)
-# np.save('./save/R_true.npy', test_truth_R)
